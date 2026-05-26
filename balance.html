@@ -680,12 +680,19 @@ window.handleDeleteMonth=handleDeleteMonth;
     const result=await apiGet();
     allData=result.data_bs||[];
     document.getElementById('loading').style.display='none';
-    render();
+    // 데이터 없으면 드롭존 표시, 있으면 대시보드 표시
+    if(allData.length===0){
+      document.getElementById('dropzone').style.display='block';
+      document.getElementById('main').style.display='none';
+    } else {
+      document.getElementById('dropzone').style.display='none';
+      document.getElementById('main').style.display='block';
+      render();
+    }
   }catch(err){
-    document.getElementById('loading').innerHTML=`
-      <div style="color:#dc2626;text-align:center;padding:40px">
-        ⚠️ 서버 연결 실패<br><small style="color:#888">${err.message}</small>
-      </div>`;
+    document.getElementById('loading').style.display='none';
+    document.getElementById('dropzone').style.display='block';
+    console.error(err);
   }
 })();
 </script>
