@@ -433,7 +433,7 @@ function render(){
     type:'doughnut',
     data:{labels:assetNames,datasets:[{data:assetVals,backgroundColor:assetColors,borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.label+': '+ctx.raw.toLocaleString()+'억 ('+（assetTotal?(ctx.raw/assetTotal*100).toFixed(1):0)+'%)'}}}
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.label+': '+ctx.raw.toLocaleString()+'억 ('+(assetTotal?(ctx.raw/assetTotal*100).toFixed(1):0)+'%)'}}}
     }
   });
   document.getElementById('asset-pie-leg').innerHTML=assetNames.map((n,i)=>`
