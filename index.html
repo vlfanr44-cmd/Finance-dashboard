@@ -97,13 +97,23 @@ tr:last-child td{border-bottom:none}
 .accum-btn{font-size:11px;font-weight:700;padding:5px 13px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:all .2s;white-space:nowrap}
 .accum-btn:hover{border-color:var(--coral);color:var(--coral);background:var(--coral-light)}
 .accum-btn.on{background:var(--grad2);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(242,123,80,.3)}
-@media(max-width:768px){.kpi-grid{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
+.nav-tabs{display:flex;gap:2px;align-items:center}
+.nav-tab{font-size:12px;font-weight:600;padding:7px 16px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .2s}
+.nav-tab:hover{background:var(--card2);color:var(--text)}
+.nav-tab.active{background:var(--grad);color:#fff;box-shadow:0 2px 8px rgba(43,78,191,.25)}
+@media(max-width:768px){.kpi-grid{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}.nav-tabs{display:none}}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <div class="logo">📊 재무 분석 대시보드</div>
+  <div style="display:flex;align-items:center;gap:20px">
+    <div class="logo">Medisola Finance</div>
+    <nav class="nav-tabs">
+      <a class="nav-tab active" href="index.html">📊 손익 대시보드</a>
+      <a class="nav-tab" href="balance.html">🏦 재무상태표</a>
+    </nav>
+  </div>
   <div class="topbar-r">
     <span class="badge" id="pbadge">데이터 없음</span>
     <label class="upbtn" id="upbtn">
