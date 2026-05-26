@@ -59,6 +59,10 @@ tr:last-child td{border-bottom:none}
 .mon-btn{font-size:11px;font-weight:500;padding:4px 11px;border-radius:6px;border:1px solid #e8e8e4;background:#fff;color:#888;cursor:pointer;transition:all .15s}
 .mon-btn:hover{border-color:#2563EB;color:#2563EB}
 .mon-btn.on{background:#2563EB;color:#fff;border-color:#2563EB}
+.mon-sep{width:1px;height:20px;background:#e8e8e4;margin:0 6px;flex-shrink:0}
+.accum-btn{font-size:11px;font-weight:600;padding:4px 12px;border-radius:6px;border:1px solid #e8e8e4;background:#fff;color:#888;cursor:pointer;transition:all .15s;white-space:nowrap}
+.accum-btn:hover{border-color:#d97706;color:#d97706}
+.accum-btn.on{background:#d97706;color:#fff;border-color:#d97706}
 @media(max-width:768px){.kpi-grid{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
 </style>
 </head>
@@ -217,6 +221,7 @@ const COL_IDX = [3,5,7,9,11,12,13,14,15,16,17,18];
 let D = null, uploadLog = null;
 let charts = {}, curTab = 'trend';
 let selectedMi = -1; // 선택된 월 인덱스 (-1이면 최근 월)
+let isAccum = false;  // 누계 모드 여부
 
 const M    = v => (typeof v==='number'&&isFinite(v)?v:0)/1e6;
 const fmtN = v => Math.round(v).toLocaleString()+'M';
@@ -346,6 +351,7 @@ async function handleFile(file){
     D=result.data;
     uploadLog=result.log;
     selectedMi=-1;
+    isAccum=false;
     render();
     toast(uploadMonth+' 업로드 완료 ✓ (1~'+MON_NM[parsed.lastMonthIdx]+' 반영)');
   }catch(err){
@@ -385,15 +391,41 @@ function render(){
   monBar.innerHTML='<span class="mon-lbl">월 선택:</span>'+
     MON_NM.slice(0,lmi+1).map(function(m,i){
       return '<button class="mon-btn'+(i===smi?' on':'')+'" onclick="selectMonth('+i+')">'+m+'</button>';
-    }).join('');
+    }).join('')+
+    '<div class="mon-sep"></div>'+
+    '<button class="accum-btn'+(isAccum?' on':'')+'" onclick="toggleAccum()">'+
+      (isAccum?'📊 누계':'📊 누계')+'</button>';
 
-  function lv(k){ return M(D[k][smi]); }
-  function pv(k){ return smi>0?M(D[k][smi-1]):null; }
+  // 단월/누계 값 계산
+  // isAccum=true 이면 0~smi 합산, false이면 smi 단월
+  function sumTo(k, toIdx){
+    var s=0;
+    for(var i=0;i<=toIdx;i++) s+=M(D[k][i]||0);
+    return s;
+  }
+  function lv(k){ return isAccum ? sumTo(k,smi) : M(D[k][smi]); }
+  function pv(k){
+    if(smi===0) return null;
+    return isAccum ? sumTo(k,smi-1) : M(D[k][smi-1]);
+  }
+  // 이익률은 누계 시 합산값으로 재계산
+  function gpRateVal(){
+    var r=isAccum?sumTo('revenue',smi):M(D.revenue[smi]);
+    var g=isAccum?sumTo('grossProfit',smi):M(D.grossProfit[smi]);
+    return r?g/r:0;
+  }
+  function opRateVal(){
+    var r=isAccum?sumTo('revenue',smi):M(D.revenue[smi]);
+    var o=isAccum?sumTo('opProfit',smi):M(D.opProfit[smi]);
+    return r?o/r:0;
+  }
 
   var lRev=lv('revenue'), lGP=lv('grossProfit'), lOP=lv('opProfit');
   var gpRate=lRev?lGP/lRev:0, opRate=lRev?lOP/lRev:0;
 
-  document.getElementById('pbadge').textContent='2026년 1~'+MON_NM[lmi]+' 누적';
+  document.getElementById('pbadge').textContent=isAccum
+    ?'2026년 1~'+MON_NM[smi]+' 누계'
+    :'2026년 1~'+MON_NM[lmi]+' 중 '+MON_NM[smi];
 
   // KPI
   var dRev=smi>0?pct(lv('revenue'),pv('revenue')):null;
@@ -401,7 +433,8 @@ function render(){
   var dOP =smi>0?pct(lv('opProfit'),pv('opProfit')):null;
 
   var lRev=lv('revenue'), lGP=lv('grossProfit'), lOP=lv('opProfit');
-  var gpRate=lRev?lGP/lRev:0, opRate=lRev?lOP/lRev:0;
+  var gpRate=gpRateVal(), opRate=opRateVal();
+  var kpiLabel=isAccum?'1~'+MON_NM[smi]+' 누계':MON_NM[smi];
 
   document.getElementById('kpis').innerHTML=[
     {l:'매출액',    v:fmtN(lRev), d:dRev},
@@ -411,7 +444,7 @@ function render(){
     {l:'영업이익률',v:fmtP(opRate),d:null,neg:opRate<0},
   ].map(function(k){
     return '<div class="kpi">'+
-      '<div class="kpi-lbl">'+k.l+' ('+MON_NM[smi]+')</div>'+
+      '<div class="kpi-lbl">'+k.l+' ('+kpiLabel+')</div>'+
       '<div class="kpi-val" style="'+(k.neg?'color:#dc2626':'')+'">'+k.v+'</div>'+
       (k.d!=null?'<div class="kpi-delta '+dc(k.d)+'">'+arr(k.d)+' '+fmtD(k.d)+' 전월比</div>':'')+
       '</div>';
@@ -476,8 +509,14 @@ function render(){
   }
 
   // 채널 파이
-  var chRevV=[D.ch_d2c,D.ch_b2b,D.ch_b2c,D.ch_store,D.ch_exp].map(function(a){return Math.round(M(a[smi]));});
-  var chGPV=[D.gp_d2c,D.gp_b2b,D.gp_b2c,D.gp_store,D.gp_exp].map(function(a){return Math.round(M(a[smi]));});
+  var chRevV=[D.ch_d2c,D.ch_b2b,D.ch_b2c,D.ch_store,D.ch_exp].map(function(a){
+    if(isAccum){ var s=0; for(var i=0;i<=smi;i++) s+=M(a[i]||0); return Math.round(s); }
+    return Math.round(M(a[smi]));
+  });
+  var chGPV=[D.gp_d2c,D.gp_b2b,D.gp_b2c,D.gp_store,D.gp_exp].map(function(a){
+    if(isAccum){ var s=0; for(var i=0;i<=smi;i++) s+=M(a[i]||0); return Math.round(s); }
+    return Math.round(M(a[smi]));
+  });
   var chRevT=chRevV.reduce(function(a,b){return a+b;},0);
   var chGPT=chGPV.reduce(function(a,b){return a+Math.max(b,0);},0);
 
@@ -518,7 +557,10 @@ function render(){
   });
 
   // 판관비 파이
-  var costV=[D.labor,D.brand,D.fee,D.otherCst,D.depr].map(function(a){return Math.round(Math.abs(M(a[smi])));});
+  var costV=[D.labor,D.brand,D.fee,D.otherCst,D.depr].map(function(a){
+    if(isAccum){ var s=0; for(var i=0;i<=smi;i++) s+=Math.abs(M(a[i]||0)); return Math.round(s); }
+    return Math.round(Math.abs(M(a[smi])));
+  });
   var costT=costV.reduce(function(a,b){return a+b;},0);
   mkChart('c-cost-pie',{
     type:'doughnut',
@@ -582,15 +624,26 @@ function render(){
     {l:'공헌이익',      k:'contribution',bold:true},
   ];
 
-  var thead='<thead><tr><th>항목</th>'+mLabels.map(function(m){return '<th>'+m+'</th>';}).join('')+'</tr></thead>';
+  var thead='<thead><tr><th>항목</th>'+mLabels.map(function(m){return '<th>'+m+'</th>';}).join('')+(isAccum?'<th style="background:#fffbeb;color:#92400e">누계</th>':'')+'</tr></thead>';
   var tbody='<tbody>'+tRows.map(function(r){
     return '<tr class="'+(r.bold?'bold':'')+'"><td>'+r.l+'</td>'+
       Array.from({length:lmi+1},function(_,mi){
         var v=r.pct?(D[r.k][mi]||0)*100:M(D[r.k][mi]||0);
         var cls=r.bold&&!r.pct?(v<0?'dn':v>0?'up':''):'';
         var disp=r.pct?v.toFixed(1)+'%':Math.round(v).toLocaleString()+'M';
-        return '<td class="'+cls+'">'+(D[r.k][mi]?disp:'—')+'</td>';
-      }).join('')+'</tr>';
+        return '<td class="'+cls+(mi===smi&&!isAccum?' "style="font-weight:700;background:#eff6ff':'"')+'">'+(D[r.k][mi]?disp:'—')+'</td>';
+      }).join('')+
+      (isAccum?(function(){
+        if(r.pct){
+          // 이익률류는 누계 합산 대신 최종값
+          var v=(D[r.k][smi]||0)*100;
+          return '<td style="background:#fffbeb;font-weight:600;color:#92400e">'+v.toFixed(1)+'%</td>';
+        }
+        var s=0; for(var i=0;i<=smi;i++) s+=M(D[r.k][i]||0);
+        var cls=r.bold?(s<0?'dn':s>0?'up':''):'';
+        return '<td class="'+cls+'" style="background:#fffbeb;font-weight:600;color:#92400e">'+Math.round(s).toLocaleString()+'M</td>';
+      })():'')+
+      '</tr>';
   }).join('')+'</tbody>';
   document.getElementById('detail-tbl').innerHTML=thead+tbody;
 
@@ -613,6 +666,11 @@ function render(){
 
 function selectMonth(mi){
   selectedMi=mi;
+  render();
+}
+
+function toggleAccum(){
+  isAccum=!isAccum;
   render();
 }
 
@@ -651,6 +709,7 @@ dz.addEventListener('click',function(){document.getElementById('finput').click()
 
 window.handleReset=handleReset;
 window.selectMonth=selectMonth;
+window.toggleAccum=toggleAccum;
 
 // 초기 로드
 (async function(){
