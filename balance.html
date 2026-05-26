@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>재무상태표 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;font-size:13px}
+.topbar{background:#fff;border-bottom:1px solid #e8e8e4;padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-size:15px;font-weight:600}
+.topbar-r{display:flex;align-items:center;gap:10px}
+.badge{font-size:11px;color:#888;background:#f3f3f0;padding:4px 10px;border-radius:20px;border:1px solid #e8e8e4}
+.upbtn{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:6px 14px;border-radius:7px;border:1px solid #d8d8d4;background:#fff;cursor:pointer;color:#1a1a1a;transition:all .15s}
+.upbtn:hover{background:#f5f5f3}
+.upbtn.busy{opacity:.5;pointer-events:none}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 20px 60px}
+.dropzone{border:1.5px dashed #d8d8d4;border-radius:10px;padding:48px 20px;text-align:center;cursor:pointer;background:#fff;transition:all .15s}
+.dropzone:hover,.dropzone.over{border-color:#2563EB;background:#eff6ff}
+.dz-icon{font-size:36px;margin-bottom:12px;color:#bbb}
+.dz-title{font-size:14px;font-weight:500;margin-bottom:8px}
+.dz-sub{font-size:12px;color:#888;line-height:2}
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:#fff;border:1px solid #e8e8e4;border-radius:9px;padding:14px 16px}
+.kpi-lbl{font-size:10px;font-weight:600;letter-spacing:.3px;color:#999;margin-bottom:6px;text-transform:uppercase}
+.kpi-val{font-size:18px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.kpi-sub{font-size:11px;color:#aaa;margin-top:4px}
+.kpi-delta{font-size:11px;font-weight:500;margin-top:4px}
+.up{color:#16a34a}.dn{color:#dc2626}.nu{color:#aaa}
+.tabs{display:flex;gap:2px;margin-bottom:14px}
+.tab{font-size:12px;font-weight:500;padding:6px 14px;border-radius:7px;border:1px solid #e8e8e4;background:#fff;color:#888;cursor:pointer;transition:all .15s}
+.tab.on{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.panel{background:#fff;border:1px solid #e8e8e4;border-radius:10px;padding:20px;margin-bottom:14px}
+.ptitle{font-size:10px;font-weight:600;letter-spacing:.5px;color:#999;margin-bottom:14px;text-transform:uppercase}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:#888;margin-bottom:10px}
+.ldot{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:3px;vertical-align:middle}
+.twrap{overflow-x:auto;border-radius:8px;border:1px solid #e8e8e4}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#f5f5f3;font-size:10px;font-weight:600;letter-spacing:.3px;color:#999;padding:8px 12px;border-bottom:1px solid #e8e8e4;text-align:right}
+th:first-child{text-align:left;min-width:160px}
+td{padding:8px 12px;border-bottom:1px solid #f0f0ee;text-align:right;font-variant-numeric:tabular-nums}
+td:first-child{text-align:left}
+tr.section td{font-weight:700;background:#f8f8f6;font-size:12px}
+tr.sub td{font-weight:600;background:#fafaf8}
+tr.detail td:first-child{padding-left:28px;color:#555}
+tr.detail2 td:first-child{padding-left:44px;color:#888;font-size:11px}
+tr:last-child td{border-bottom:none}
+.ratio-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.ratio-card{background:#fff;border:1px solid #e8e8e4;border-radius:9px;padding:14px 16px}
+.ratio-lbl{font-size:10px;font-weight:600;letter-spacing:.3px;color:#999;margin-bottom:4px;text-transform:uppercase}
+.ratio-val{font-size:20px;font-weight:700;letter-spacing:-.5px}
+.ratio-desc{font-size:10px;color:#bbb;margin-top:4px}
+.ratio-good{border-left:3px solid #16a34a}
+.ratio-warn{border-left:3px solid #d97706}
+.ratio-bad{border-left:3px solid #dc2626}
+.ratio-neu{border-left:3px solid #e8e8e4}
+.mgr-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fafaf8;border-radius:8px;margin-bottom:8px;border:1px solid #eeeeea;flex-wrap:wrap;gap:8px}
+.dbtn{font-size:11px;padding:4px 10px;border-radius:5px;border:1px solid #fcc;background:#fff;color:#dc2626;cursor:pointer}
+.empty{text-align:center;padding:48px;color:#bbb;font-size:13px}
+.toast{position:fixed;top:62px;right:16px;z-index:999;font-size:12px;font-weight:500;padding:9px 15px;border-radius:8px;opacity:0;transition:opacity .25s;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.toast.show{opacity:1}
+.toast.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
+.toast.err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.toast.info{background:#fff;color:#1a1a1a;border:1px solid #e8e8e4}
+@media(max-width:768px){.kpi-grid{grid-template-columns:1fr 1fr}.g2,.g3{grid-template-columns:1fr}.ratio-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🏦 재무상태표 대시보드</div>
+  <div class="topbar-r">
+    <span class="badge" id="pbadge">데이터 없음</span>
+    <label class="upbtn" id="upbtn">
+      <input type="file" id="finput" accept=".xlsx,.xls" style="display:none">
+      ↑ 재무상태표 업로드
+    </label>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="wrap">
+  <div id="loading" class="empty" style="padding:60px">데이터를 불러오는 중...</div>
+
+  <div id="dropzone" class="dropzone" style="display:none">
+    <div class="dz-icon">📂</div>
+    <div class="dz-title">ERP에서 내려받은 재무상태표 파일을 업로드하세요</div>
+    <div class="dz-sub">
+      <b>재무상태표_2026_04_.xlsx</b> 형태 그대로 올리면 됩니다<br>
+      당기/전기 데이터를 자동으로 인식합니다<br>
+      매월 업로드하면 누적 추이를 볼 수 있습니다
+    </div>
+  </div>
+
+  <div id="main" style="display:none">
+    <div class="kpi-grid" id="kpis"></div>
+    <div class="tabs">
+      <button class="tab on" data-t="overview">재무 현황</button>
+      <button class="tab" data-t="ratio">재무 비율</button>
+      <button class="tab" data-t="trend">추이 분석</button>
+      <button class="tab" data-t="detail">상세 내역</button>
+      <button class="tab" data-t="mgr">데이터 관리</button>
+    </div>
+
+    <!-- 재무 현황 -->
+    <div id="pane-overview">
+      <div class="g2">
+        <div class="panel">
+          <div class="ptitle">자산 구성 (당기)</div>
+          <div class="legend">
+            <span><span class="ldot" style="background:#2563EB"></span>유동자산</span>
+            <span><span class="ldot" style="background:#7c3aed"></span>고정자산</span>
+          </div>
+          <div style="position:relative;height:220px"><canvas id="c-asset-pie" role="img" aria-label="자산 구성">자산 파이</canvas></div>
+          <div id="asset-pie-leg" class="legend" style="margin-top:10px;margin-bottom:0;flex-direction:column;gap:5px"></div>
+        </div>
+        <div class="panel">
+          <div class="ptitle">부채·자본 구성 (당기)</div>
+          <div class="legend">
+            <span><span class="ldot" style="background:#dc2626"></span>유동부채</span>
+            <span><span class="ldot" style="background:#f97316"></span>고정부채</span>
+            <span><span class="ldot" style="background:#16a34a"></span>자본</span>
+          </div>
+          <div style="position:relative;height:220px"><canvas id="c-liab-pie" role="img" aria-label="부채자본 구성">부채자본 파이</canvas></div>
+          <div id="liab-pie-leg" class="legend" style="margin-top:10px;margin-bottom:0;flex-direction:column;gap:5px"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">당기 vs 전기 비교</div>
+        <div class="twrap">
+          <table id="compare-tbl"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 재무 비율 -->
+    <div id="pane-ratio" style="display:none">
+      <div class="panel">
+        <div class="ptitle">안정성 지표</div>
+        <div class="ratio-grid" id="ratio-stability"></div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">수익성 지표</div>
+        <div class="ratio-grid" id="ratio-profit"></div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">성장성 지표</div>
+        <div class="ratio-grid" id="ratio-growth"></div>
+      </div>
+    </div>
+
+    <!-- 추이 분석 -->
+    <div id="pane-trend" style="display:none">
+      <div class="g2">
+        <div class="panel">
+          <div class="ptitle">자산·부채·자본 추이</div>
+          <div class="legend">
+            <span><span class="ldot" style="background:#2563EB"></span>자산</span>
+            <span><span class="ldot" style="background:#dc2626"></span>부채</span>
+            <span><span class="ldot" style="background:#16a34a"></span>자본</span>
+          </div>
+          <div style="position:relative;height:240px"><canvas id="c-bs-trend" role="img" aria-label="재무상태 추이">추이 차트</canvas></div>
+        </div>
+        <div class="panel">
+          <div class="ptitle">부채비율 · 유동비율 추이</div>
+          <div class="legend">
+            <span><span class="ldot" style="background:#dc2626"></span>부채비율</span>
+            <span><span class="ldot" style="background:#2563EB"></span>유동비율</span>
+          </div>
+          <div style="position:relative;height:240px"><canvas id="c-ratio-trend" role="img" aria-label="비율 추이">비율 추이</canvas></div>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="panel">
+          <div class="ptitle">유동자산 구성 추이</div>
+          <div class="legend">
+            <span><span class="ldot" style="background:#2563EB"></span>현금성자산</span>
+            <span><span class="ldot" style="background:#7c3aed"></span>매출채권</span>
+            <span><span class="ldot" style="background:#d97706"></span>재고자산</span>
+            <span><span class="ldot" style="background:#888"></span>기타</span>
+          </div>
+          <div style="position:relative;height:220px"><canvas id="c-ca-trend" role="img" aria-label="유동자산 추이">유동자산 추이</canvas></div>
+        </div>
+        <div class="panel">
+          <div class="ptitle">이익잉여금 추이</div>
+          <div class="legend">
+            <span><span class="ldot" style="background:#16a34a"></span>이익잉여금</span>
+          </div>
+          <div style="position:relative;height:220px"><canvas id="c-re-trend" role="img" aria-label="이익잉여금 추이">이익잉여금 추이</canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 상세 내역 -->
+    <div id="pane-detail" style="display:none">
+      <div class="panel">
+        <div class="ptitle">재무상태표 상세 (단위: 원)</div>
+        <div class="twrap"><table id="detail-tbl"></table></div>
+      </div>
+    </div>
+
+    <!-- 데이터 관리 -->
+    <div id="pane-mgr" style="display:none">
+      <div class="panel">
+        <div class="ptitle">업로드 이력</div>
+        <div id="mgr-list"></div>
+        <div id="mgr-months" style="margin-top:12px"></div>
+        <p style="font-size:11px;color:#bbb;margin-top:14px">💡 매월 재무상태표를 업로드하면 추이 분석이 가능합니다.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbxft4SwgXRNwuSSD04Oeb8cn8WRoZo_eFq-8CnvoHbK01QZ-LbstqUYX0K3oc2BoPg/exec';
+
+let allData = []; // [{period, label, data}]
+let charts = {}, curTab = 'overview';
+
+const B  = v => Math.round((v||0)/1e8*10)/10;   // 원→억원 (소수1자리)
+const fmtB = v => B(v).toLocaleString()+'억';
+const fmtR = v => v==null||!isFinite(v)?'-':v.toFixed(1)+'%';
+const fmtRd= v => v==null||!isFinite(v)?'-':((v>=0?'+':'')+v.toFixed(1)+'%');
+const pct  = (a,b)=>b?(a-b)/Math.abs(b)*100:null;
+const dc   = v=>v>0?'up':v<0?'dn':'nu';
+const arr  = v=>v>=0?'▲':'▼';
+
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show '+type;
+  clearTimeout(t._t); t._t=setTimeout(()=>t.className='toast',3500);
+}
+
+// ── API ──────────────────────────────────────────────────
+async function apiGet(){
+  const r=await fetch(API+'?action=get');
+  const j=await r.json();
+  if(!j.ok) throw new Error(j.error);
+  return j;
+}
+async function apiSave(key,value){
+  const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key,value})});
+  const j=await r.json(); if(!j.ok) throw new Error(j.error);
+}
+async function apiClear(){
+  const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'clear'})});
+  const j=await r.json(); if(!j.ok) throw new Error(j.error);
+}
+
+// ── 엑셀 파싱 ────────────────────────────────────────────
+function parseBS(rows){
+  // 계정과목명으로 값 찾기
+  function findVal(keyword, colIdx){
+    for(const row of rows){
+      const label = String(row[0]||'').replace(/\s/g,'');
+      if(label.includes(keyword)){
+        // 숫자 값들 추출
+        const nums = row.filter(v=>typeof v==='number'&&v>100);
+        if(nums.length >= colIdx+1) return nums[colIdx];
+        if(nums.length >= 1) return nums[0];
+      }
+    }
+    return 0;
+  }
+
+  // 당기=0번째 숫자, 전기=1번째 숫자
+  function cur(kw){ return findVal(kw,0); }
+  function prev(kw){ return findVal(kw,1)||findVal(kw,0); }
+
+  // 기간 정보 추출
+  let curPeriod='당기', prevPeriod='전기';
+  for(const row of rows){
+    const txt = row.join(' ');
+    const m1 = txt.match(/(\d{4})년\s*(\d{2})월/);
+    if(m1) { curPeriod=m1[1]+'.'+m1[2]; break; }
+  }
+
+  const d = {
+    curPeriod, prevPeriod,
+    // 자산
+    cur_totalAsset:    cur('자산'),
+    cur_curAsset:      cur('유동자산'),
+    cur_cash:          cur('현금및현금등가물'),
+    cur_shortFin:      cur('단기금융상품'),
+    cur_receivable:    cur('매출채권'),
+    cur_inventory:     cur('재고자산'),
+    cur_prepaid:       cur('선급금')||0,
+    cur_fixedAsset:    cur('고정자산'),
+    cur_tangible:      cur('유형자산'),
+    cur_intangible:    cur('무형자산'),
+    cur_otherFixed:    cur('기타비유동자산'),
+    // 부채
+    cur_totalLiab:     cur('부채'),
+    cur_curLiab:       cur('유동부채'),
+    cur_payable:       cur('매입채무'),
+    cur_fixedLiab:     cur('고정부채'),
+    cur_retire:        cur('퇴직급여충당금'),
+    // 자본
+    cur_totalEquity:   cur('자본'),
+    cur_capStock:      cur('자본금'),
+    cur_capSurplus:    cur('자본잉여금'),
+    cur_retained:      cur('이익잉여금'),
+    cur_netIncome:     cur('당기순이익'),
+
+    // 전기
+    prev_totalAsset:   prev('자산'),
+    prev_curAsset:     prev('유동자산'),
+    prev_cash:         prev('현금및현금등가물'),
+    prev_shortFin:     prev('단기금융상품'),
+    prev_receivable:   prev('매출채권'),
+    prev_inventory:    prev('재고자산'),
+    prev_fixedAsset:   prev('고정자산'),
+    prev_tangible:     prev('유형자산'),
+    prev_intangible:   prev('무형자산'),
+    prev_totalLiab:    prev('부채'),
+    prev_curLiab:      prev('유동부채'),
+    prev_fixedLiab:    prev('고정부채'),
+    prev_totalEquity:  prev('자본'),
+    prev_capStock:     prev('자본금'),
+    prev_capSurplus:   prev('자본잉여금'),
+    prev_retained:     prev('이익잉여금'),
+  };
+
+  // 재무비율 계산
+  d.ratio_currentRatio   = d.cur_curLiab    ? d.cur_curAsset/d.cur_curLiab*100          : null;
+  d.ratio_debtRatio      = d.cur_totalEquity? d.cur_totalLiab/d.cur_totalEquity*100      : null;
+  d.ratio_equityRatio    = d.cur_totalAsset ? d.cur_totalEquity/d.cur_totalAsset*100     : null;
+  d.ratio_quickRatio     = d.cur_curLiab    ? (d.cur_curAsset-d.cur_inventory)/d.cur_curLiab*100 : null;
+  d.ratio_debtToAsset    = d.cur_totalAsset ? d.cur_totalLiab/d.cur_totalAsset*100       : null;
+  d.ratio_assetGrowth    = d.prev_totalAsset? pct(d.cur_totalAsset,d.prev_totalAsset)    : null;
+  d.ratio_equityGrowth   = d.prev_totalEquity? pct(d.cur_totalEquity,d.prev_totalEquity) : null;
+  d.ratio_liabGrowth     = d.prev_totalLiab ? pct(d.cur_totalLiab,d.prev_totalLiab)     : null;
+  d.ratio_cashRatio      = d.cur_curLiab    ? (d.cur_cash+d.cur_shortFin)/d.cur_curLiab*100 : null;
+  d.ratio_inventoryTurn  = d.cur_inventory  ? d.cur_totalAsset/d.cur_inventory           : null;
+
+  return d;
+}
+
+function readXlsx(file){
+  return new Promise((res,rej)=>{
+    const rd=new FileReader();
+    rd.onload=e=>{
+      try{
+        const wb=XLSX.read(e.target.result,{type:'binary'});
+        const sn=wb.SheetNames[0];
+        const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1});
+        res(rows);
+      }catch(err){rej(err);}
+    };
+    rd.onerror=rej;
+    rd.readAsBinaryString(file);
+  });
+}
+
+async function handleFile(file){
+  const btn=document.getElementById('upbtn');
+  btn.classList.add('busy');
+  toast('파일 분석 중...','info');
+  try{
+    const rows=await readXlsx(file);
+    const parsed=parseBS(rows);
+    const period=parsed.curPeriod;
+
+    // 기존 데이터 불러와서 해당 월 추가/교체
+    const result=await apiGet();
+    let stored=result.data_bs||[];
+    stored=stored.filter(d=>d.period!==period);
+    stored.push({period, data:parsed});
+    stored.sort((a,b)=>a.period.localeCompare(b.period));
+
+    await apiSave('__data_bs__', stored);
+    allData=stored;
+    render();
+    toast(period+' 재무상태표 업로드 완료 ✓');
+  }catch(err){
+    toast('오류: '+err.message,'err');
+    console.error(err);
+  }
+  btn.classList.remove('busy');
+  document.getElementById('finput').value='';
+}
+
+// ── 차트 ─────────────────────────────────────────────────
+function mkChart(id,cfg){
+  if(charts[id]) charts[id].destroy();
+  charts[id]=new Chart(document.getElementById(id),cfg);
+}
+const xAx={ticks:{font:{size:10},autoSkip:false,maxRotation:45},grid:{display:false}};
+const yAx=(cb)=>({ticks:{font:{size:10},callback:cb},grid:{color:'rgba(0,0,0,0.04)'}});
+
+// ── 렌더 ─────────────────────────────────────────────────
+function render(){
+  const has=allData.length>0;
+  document.getElementById('dropzone').style.display=has?'none':'block';
+  document.getElementById('main').style.display=has?'block':'none';
+  if(!has) return;
+
+  const latest=allData[allData.length-1];
+  const L=latest.data;
+  const prev=allData[allData.length-2];
+  const P=prev?prev.data:null;
+
+  document.getElementById('pbadge').textContent=
+    allData.length>1
+      ? allData[0].period+' ~ '+latest.period+' · '+allData.length+'개월'
+      : latest.period+' 기준';
+
+  // ── KPI ──────────────────────────────────────────────
+  document.getElementById('kpis').innerHTML=[
+    {l:'자산총계',   v:fmtB(L.cur_totalAsset),  d:P?pct(L.cur_totalAsset,P.cur_totalAsset):null,   inv:false},
+    {l:'부채총계',   v:fmtB(L.cur_totalLiab),   d:P?pct(L.cur_totalLiab,P.cur_totalLiab):null,    inv:true},
+    {l:'자본총계',   v:fmtB(L.cur_totalEquity),  d:P?pct(L.cur_totalEquity,P.cur_totalEquity):null, inv:false},
+    {l:'부채비율',   v:fmtR(L.ratio_debtRatio),  d:null, warn:L.ratio_debtRatio>200},
+    {l:'유동비율',   v:fmtR(L.ratio_currentRatio),d:null, good:L.ratio_currentRatio>200},
+  ].map(k=>`
+    <div class="kpi">
+      <div class="kpi-lbl">${k.l}</div>
+      <div class="kpi-val" style="${k.warn?'color:#dc2626':k.good?'color:#16a34a':''}">${k.v}</div>
+      ${k.d!=null?`<div class="kpi-delta ${dc(k.d)}">${arr(k.d)} ${fmtRd(k.d)} 전월比</div>`:''}
+    </div>`).join('');
+
+  // ── 자산 파이 ─────────────────────────────────────────
+  const assetVals=[L.cur_curAsset, L.cur_fixedAsset].map(v=>Math.round(B(v)));
+  const assetNames=['유동자산','고정자산'];
+  const assetColors=['#2563EB','#7c3aed'];
+  const assetTotal=assetVals.reduce((a,b)=>a+b,0);
+  mkChart('c-asset-pie',{
+    type:'doughnut',
+    data:{labels:assetNames,datasets:[{data:assetVals,backgroundColor:assetColors,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.label+': '+ctx.raw.toLocaleString()+'억 ('+（assetTotal?(ctx.raw/assetTotal*100).toFixed(1):0)+'%)'}}}
+    }
+  });
+  document.getElementById('asset-pie-leg').innerHTML=assetNames.map((n,i)=>`
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:#666">
+      <span><span class="ldot" style="background:${assetColors[i]}"></span>${n}</span>
+      <span>${assetVals[i].toLocaleString()}억 · ${assetTotal?(assetVals[i]/assetTotal*100).toFixed(1):0}%</span>
+    </div>`).join('');
+
+  // ── 부채·자본 파이 ────────────────────────────────────
+  const lcVals=[L.cur_curLiab, L.cur_fixedLiab, L.cur_totalEquity].map(v=>Math.round(Math.abs(B(v))));
+  const lcNames=['유동부채','고정부채','자본'];
+  const lcColors=['#dc2626','#f97316','#16a34a'];
+  const lcTotal=lcVals.reduce((a,b)=>a+b,0);
+  mkChart('c-liab-pie',{
+    type:'doughnut',
+    data:{labels:lcNames,datasets:[{data:lcVals,backgroundColor:lcColors,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.label+': '+ctx.raw.toLocaleString()+'억 ('+(lcTotal?(ctx.raw/lcTotal*100).toFixed(1):0)+'%)'}}}
+    }
+  });
+  document.getElementById('liab-pie-leg').innerHTML=lcNames.map((n,i)=>`
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:#666">
+      <span><span class="ldot" style="background:${lcColors[i]}"></span>${n}</span>
+      <span>${lcVals[i].toLocaleString()}억 · ${lcTotal?(lcVals[i]/lcTotal*100).toFixed(1):0}%</span>
+    </div>`).join('');
+
+  // ── 비교 테이블 ───────────────────────────────────────
+  const rows=[
+    {l:'자산총계', c:L.cur_totalAsset, p:L.prev_totalAsset, cls:'section'},
+    {l:'　유동자산', c:L.cur_curAsset, p:L.prev_curAsset, cls:'sub'},
+    {l:'　　현금및현금등가물', c:L.cur_cash, p:L.prev_cash, cls:'detail'},
+    {l:'　　단기금융상품', c:L.cur_shortFin, p:L.prev_shortFin, cls:'detail'},
+    {l:'　　매출채권', c:L.cur_receivable, p:L.prev_receivable, cls:'detail'},
+    {l:'　　재고자산', c:L.cur_inventory, p:L.prev_inventory, cls:'detail'},
+    {l:'　고정자산', c:L.cur_fixedAsset, p:L.prev_fixedAsset, cls:'sub'},
+    {l:'　　유형자산', c:L.cur_tangible, p:L.prev_tangible, cls:'detail'},
+    {l:'　　무형자산', c:L.cur_intangible, p:L.prev_intangible, cls:'detail'},
+    {l:'부채총계', c:L.cur_totalLiab, p:L.prev_totalLiab, cls:'section'},
+    {l:'　유동부채', c:L.cur_curLiab, p:L.prev_curLiab, cls:'sub'},
+    {l:'　고정부채', c:L.cur_fixedLiab, p:L.prev_fixedLiab, cls:'sub'},
+    {l:'자본총계', c:L.cur_totalEquity, p:L.prev_totalEquity, cls:'section'},
+    {l:'　자본금', c:L.cur_capStock, p:L.prev_capStock, cls:'sub'},
+    {l:'　자본잉여금', c:L.cur_capSurplus, p:L.prev_capSurplus, cls:'sub'},
+    {l:'　이익잉여금', c:L.cur_retained, p:L.prev_retained, cls:'sub'},
+  ];
+  document.getElementById('compare-tbl').innerHTML=`
+    <thead><tr><th>계정과목</th><th>당기 (${L.curPeriod})</th><th>전기 (${L.prevPeriod})</th><th>증감(억)</th><th>증감률</th></tr></thead>
+    <tbody>${rows.map(r=>{
+      const diff=r.c-r.p, pp=pct(r.c,r.p);
+      const cls=diff>=0?'up':'dn';
+      return `<tr class="${r.cls||''}">
+        <td>${r.l}</td>
+        <td>${r.c?Math.round(B(r.c)).toLocaleString()+'억':'-'}</td>
+        <td>${r.p?Math.round(B(r.p)).toLocaleString()+'억':'-'}</td>
+        <td class="${cls}">${r.p?(diff>=0?'+':'')+Math.round(B(diff)).toLocaleString()+'억':'-'}</td>
+        <td class="${cls}">${r.p?fmtRd(pp):'-'}</td>
+      </tr>`;
+    }).join('')}</tbody>`;
+
+  // ── 재무비율 ─────────────────────────────────────────
+  function ratioCard(lbl, val, unit, desc, status){
+    const cls=status==='good'?'ratio-good':status==='warn'?'ratio-warn':status==='bad'?'ratio-bad':'ratio-neu';
+    const color=status==='good'?'#16a34a':status==='bad'?'#dc2626':status==='warn'?'#d97706':'#1a1a1a';
+    return `<div class="ratio-card ${cls}">
+      <div class="ratio-lbl">${lbl}</div>
+      <div class="ratio-val" style="color:${color}">${val==null||!isFinite(val)?'-':val.toFixed(1)+unit}</div>
+      <div class="ratio-desc">${desc}</div>
+    </div>`;
+  }
+
+  const cr=L.ratio_currentRatio, dr=L.ratio_debtRatio, er=L.ratio_equityRatio,
+        qr=L.ratio_quickRatio,   ch=L.ratio_cashRatio,  da=L.ratio_debtToAsset;
+
+  document.getElementById('ratio-stability').innerHTML=[
+    ratioCard('유동비율', cr, '%', '권고: 200% 이상', cr>200?'good':cr>100?'warn':'bad'),
+    ratioCard('당좌비율', qr, '%', '권고: 100% 이상', qr>100?'good':qr>70?'warn':'bad'),
+    ratioCard('현금비율', ch, '%', '현금·단기금융상품/유동부채', ch>50?'good':ch>20?'warn':'bad'),
+    ratioCard('부채비율', dr, '%', '권고: 200% 이하', dr<100?'good':dr<200?'warn':'bad'),
+    ratioCard('자기자본비율', er, '%', '권고: 50% 이상', er>50?'good':er>30?'warn':'bad'),
+    ratioCard('부채/자산비율', da, '%', '낮을수록 안정적', da<30?'good':da<50?'warn':'bad'),
+  ].join('');
+
+  document.getElementById('ratio-profit').innerHTML=[
+    ratioCard('이익잉여금/자본', L.cur_totalEquity?(L.cur_retained/L.cur_totalEquity*100):null, '%', '자본 중 누적이익 비중',
+      L.cur_retained>0?'good':L.cur_retained>-1e9?'warn':'bad'),
+    ratioCard('유동자산/총자산', L.cur_totalAsset?(L.cur_curAsset/L.cur_totalAsset*100):null, '%', '높을수록 유동성 양호',
+      L.cur_curAsset/L.cur_totalAsset>0.6?'good':L.cur_curAsset/L.cur_totalAsset>0.4?'warn':'neu'),
+    ratioCard('무형자산/총자산', L.cur_totalAsset?(L.cur_intangible/L.cur_totalAsset*100):null, '%', '개발비 등 무형자산 비중', 'neu'),
+    ratioCard('당기순이익(억)', L.cur_netIncome/1e8, '', '당기 순손익', L.cur_netIncome>0?'good':'bad'),
+  ].join('');
+
+  document.getElementById('ratio-growth').innerHTML=[
+    ratioCard('자산증가율', L.ratio_assetGrowth, '%', '전기 대비 자산 변화',
+      L.ratio_assetGrowth>0?'good':L.ratio_assetGrowth>-5?'warn':'bad'),
+    ratioCard('자본증가율', L.ratio_equityGrowth, '%', '전기 대비 자본 변화',
+      L.ratio_equityGrowth>0?'good':L.ratio_equityGrowth>-5?'warn':'bad'),
+    ratioCard('부채증가율', L.ratio_liabGrowth, '%', '전기 대비 부채 변화',
+      L.ratio_liabGrowth<0?'good':L.ratio_liabGrowth<10?'warn':'bad'),
+    ratioCard('현금성자산(억)', (L.cur_cash+L.cur_shortFin)/1e8, '', '현금+단기금융상품', 'neu'),
+  ].join('');
+
+  // ── 추이 차트 ─────────────────────────────────────────
+  const mLabels=allData.map(d=>d.period);
+  mkChart('c-bs-trend',{
+    type:'line',
+    data:{labels:mLabels,datasets:[
+      {label:'자산',data:allData.map(d=>Math.round(B(d.data.cur_totalAsset))),borderColor:'#2563EB',backgroundColor:'#2563EB22',borderWidth:2,pointRadius:3,tension:.3,fill:false},
+      {label:'부채',data:allData.map(d=>Math.round(B(d.data.cur_totalLiab))),borderColor:'#dc2626',backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.3,borderDash:[4,3]},
+      {label:'자본',data:allData.map(d=>Math.round(B(d.data.cur_totalEquity))),borderColor:'#16a34a',backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.raw.toLocaleString()+'억'}}},
+      scales:{x:xAx,y:yAx(v=>v.toLocaleString()+'억')}}
+  });
+
+  mkChart('c-ratio-trend',{
+    type:'line',
+    data:{labels:mLabels,datasets:[
+      {label:'부채비율',data:allData.map(d=>d.data.ratio_debtRatio!=null?+d.data.ratio_debtRatio.toFixed(1):null),borderColor:'#dc2626',backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.3,yAxisID:'y'},
+      {label:'유동비율',data:allData.map(d=>d.data.ratio_currentRatio!=null?+d.data.ratio_currentRatio.toFixed(1):null),borderColor:'#2563EB',backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.3,borderDash:[4,3],yAxisID:'y1'},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.raw+'%'}}},
+      scales:{x:xAx,y:{...yAx(v=>v+'%'),position:'left'},y1:{ticks:{font:{size:10},callback:v=>v+'%'},grid:{display:false},position:'right'}}}
+  });
+
+  mkChart('c-ca-trend',{
+    type:'bar',
+    data:{labels:mLabels,datasets:[
+      {label:'현금성자산',data:allData.map(d=>Math.round(B(d.data.cur_cash+d.data.cur_shortFin))),backgroundColor:'#2563EB',borderRadius:2},
+      {label:'매출채권',data:allData.map(d=>Math.round(B(d.data.cur_receivable))),backgroundColor:'#7c3aed',borderRadius:2},
+      {label:'재고자산',data:allData.map(d=>Math.round(B(d.data.cur_inventory))),backgroundColor:'#d97706',borderRadius:2},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+      scales:{x:{...xAx,stacked:true},y:{...yAx(v=>v+'억'),stacked:true}}}
+  });
+
+  mkChart('c-re-trend',{
+    type:'bar',
+    data:{labels:mLabels,datasets:[
+      {label:'이익잉여금',data:allData.map(d=>Math.round(B(d.data.cur_retained))),
+       backgroundColor:allData.map(d=>d.data.cur_retained>=0?'#16a34a88':'#dc262688'),borderRadius:3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.raw.toLocaleString()+'억'}}},
+      scales:{x:xAx,y:yAx(v=>v+'억')}}
+  });
+
+  // ── 상세 테이블 ───────────────────────────────────────
+  document.getElementById('detail-tbl').innerHTML=`
+    <thead><tr><th>계정과목</th><th>당기 (${L.curPeriod})</th><th>전기 (${L.prevPeriod})</th></tr></thead>
+    <tbody>${[
+      {l:'■ 자산총계', c:L.cur_totalAsset, p:L.prev_totalAsset, cls:'section'},
+      {l:'Ⅰ 유동자산', c:L.cur_curAsset, p:L.prev_curAsset, cls:'sub'},
+      {l:'  현금및현금등가물', c:L.cur_cash, p:L.prev_cash, cls:'detail'},
+      {l:'  단기금융상품', c:L.cur_shortFin, p:L.prev_shortFin, cls:'detail'},
+      {l:'  매출채권(순액)', c:L.cur_receivable, p:L.prev_receivable, cls:'detail'},
+      {l:'  재고자산', c:L.cur_inventory, p:L.prev_inventory, cls:'detail'},
+      {l:'Ⅱ 고정자산', c:L.cur_fixedAsset, p:L.prev_fixedAsset, cls:'sub'},
+      {l:'  유형자산', c:L.cur_tangible, p:L.prev_tangible, cls:'detail'},
+      {l:'  무형자산', c:L.cur_intangible, p:L.prev_intangible, cls:'detail'},
+      {l:'■ 부채총계', c:L.cur_totalLiab, p:L.prev_totalLiab, cls:'section'},
+      {l:'Ⅰ 유동부채', c:L.cur_curLiab, p:L.prev_curLiab, cls:'sub'},
+      {l:'Ⅱ 고정부채', c:L.cur_fixedLiab, p:L.prev_fixedLiab, cls:'sub'},
+      {l:'■ 자본총계', c:L.cur_totalEquity, p:L.prev_totalEquity, cls:'section'},
+      {l:'Ⅰ 자본금', c:L.cur_capStock, p:L.prev_capStock, cls:'sub'},
+      {l:'Ⅱ 자본잉여금', c:L.cur_capSurplus, p:L.prev_capSurplus, cls:'sub'},
+      {l:'Ⅲ 이익잉여금', c:L.cur_retained, p:L.prev_retained, cls:'sub'},
+      {l:'  당기순이익', c:L.cur_netIncome, p:null, cls:'detail'},
+    ].map(r=>`<tr class="${r.cls||''}">
+      <td>${r.l}</td>
+      <td>${r.c?Math.round(r.c).toLocaleString():'-'}</td>
+      <td>${r.p?Math.round(r.p).toLocaleString():'-'}</td>
+    </tr>`).join('')}</tbody>`;
+
+  // ── 데이터 관리 ───────────────────────────────────────
+  document.getElementById('mgr-list').innerHTML=`
+    <div class="mgr-row">
+      <div>
+        <div style="font-weight:600;margin-bottom:3px">저장된 기간: ${allData.map(d=>d.period).join(', ')}</div>
+        <div style="font-size:11px;color:#888">총 ${allData.length}개월 데이터</div>
+      </div>
+      <button class="dbtn" onclick="handleReset()">전체 초기화</button>
+    </div>`;
+
+  document.getElementById('mgr-months').innerHTML=allData.map(d=>`
+    <div class="mgr-row">
+      <span style="font-weight:600">${d.period}</span>
+      <span style="color:#888;font-size:12px">자산 ${Math.round(B(d.data.cur_totalAsset)).toLocaleString()}억 · 부채비율 ${fmtR(d.data.ratio_debtRatio)}</span>
+      <button class="dbtn" onclick="handleDeleteMonth('${d.period}')">삭제</button>
+    </div>`).join('');
+}
+
+async function handleReset(){
+  if(!confirm('재무상태표 데이터를 모두 초기화할까요?')) return;
+  try{
+    await apiSave('__data_bs__', []);
+    allData=[];
+    render();
+    toast('초기화 완료');
+  }catch(err){toast('오류: '+err.message,'err');}
+}
+
+async function handleDeleteMonth(period){
+  if(!confirm(period+' 데이터를 삭제할까요?')) return;
+  try{
+    allData=allData.filter(d=>d.period!==period);
+    await apiSave('__data_bs__', allData);
+    render();
+    toast(period+' 삭제 완료');
+  }catch(err){toast('오류: '+err.message,'err');}
+}
+
+// ── 탭 ───────────────────────────────────────────────────
+document.querySelector('.tabs').addEventListener('click',e=>{
+  const b=e.target.closest('.tab'); if(!b) return;
+  const t=b.dataset.t; curTab=t;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
+  ['overview','ratio','trend','detail','mgr'].forEach(x=>{
+    document.getElementById('pane-'+x).style.display=x===t?'block':'none';
+  });
+});
+
+// ── 파일 ─────────────────────────────────────────────────
+document.getElementById('finput').addEventListener('change',e=>{
+  if(e.target.files[0]) handleFile(e.target.files[0]);
+});
+const dz=document.getElementById('dropzone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{
+  e.preventDefault();dz.classList.remove('over');
+  if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+dz.addEventListener('click',()=>document.getElementById('finput').click());
+
+window.handleReset=handleReset;
+window.handleDeleteMonth=handleDeleteMonth;
+
+// ── 초기 로드 ─────────────────────────────────────────────
+(async()=>{
+  try{
+    const result=await apiGet();
+    allData=result.data_bs||[];
+    document.getElementById('loading').style.display='none';
+    render();
+  }catch(err){
+    document.getElementById('loading').innerHTML=`
+      <div style="color:#dc2626;text-align:center;padding:40px">
+        ⚠️ 서버 연결 실패<br><small style="color:#888">${err.message}</small>
+      </div>`;
+  }
+})();
+</script>
+</body>
+</html>
