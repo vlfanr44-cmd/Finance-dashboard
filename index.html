@@ -54,6 +54,11 @@ tr:last-child td{border-bottom:none}
 .toast.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
 .toast.err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
 .toast.info{background:#fff;color:#1a1a1a;border:1px solid #e8e8e4}
+.mon-bar{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.mon-lbl{font-size:11px;color:#999;font-weight:600;margin-right:4px;white-space:nowrap}
+.mon-btn{font-size:11px;font-weight:500;padding:4px 11px;border-radius:6px;border:1px solid #e8e8e4;background:#fff;color:#888;cursor:pointer;transition:all .15s}
+.mon-btn:hover{border-color:#2563EB;color:#2563EB}
+.mon-btn.on{background:#2563EB;color:#fff;border-color:#2563EB}
 @media(max-width:768px){.kpi-grid{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
 </style>
 </head>
@@ -86,6 +91,9 @@ tr:last-child td{border-bottom:none}
   </div>
 
   <div id="main" style="display:none">
+    <div class="mon-bar" id="mon-bar">
+      <span class="mon-lbl">월 선택:</span>
+    </div>
     <div class="kpi-grid" id="kpis"></div>
     <div class="tabs">
       <button class="tab on" data-t="trend">손익 추이</button>
@@ -208,6 +216,7 @@ const COL_IDX = [3,5,7,9,11,12,13,14,15,16,17,18];
 
 let D = null, uploadLog = null;
 let charts = {}, curTab = 'trend';
+let selectedMi = -1; // 선택된 월 인덱스 (-1이면 최근 월)
 
 const M    = v => (typeof v==='number'&&isFinite(v)?v:0)/1e6;
 const fmtN = v => Math.round(v).toLocaleString()+'M';
@@ -336,6 +345,7 @@ async function handleFile(file){
     var result=await apiGet();
     D=result.data;
     uploadLog=result.log;
+    selectedMi=-1;
     render();
     toast(uploadMonth+' 업로드 완료 ✓ (1~'+MON_NM[parsed.lastMonthIdx]+' 반영)');
   }catch(err){
@@ -363,10 +373,22 @@ function render(){
   if(!has) return;
 
   var lmi=D.lastMonthIdx;
+
+  // 선택된 월이 유효하지 않으면 최근 월로 초기화
+  if(selectedMi<0 || selectedMi>lmi) selectedMi=lmi;
+
+  var smi=selectedMi; // 현재 선택된 월 인덱스
   var mLabels=MON_NM.slice(0,lmi+1);
 
-  function lv(k){ return M(D[k][lmi]); }
-  function pv(k){ return lmi>0?M(D[k][lmi-1]):null; }
+  // ── 월 선택 바 ──
+  var monBar=document.getElementById('mon-bar');
+  monBar.innerHTML='<span class="mon-lbl">월 선택:</span>'+
+    MON_NM.slice(0,lmi+1).map(function(m,i){
+      return '<button class="mon-btn'+(i===smi?' on':'')+'" onclick="selectMonth('+i+')">'+m+'</button>';
+    }).join('');
+
+  function lv(k){ return M(D[k][smi]); }
+  function pv(k){ return smi>0?M(D[k][smi-1]):null; }
 
   var lRev=lv('revenue'), lGP=lv('grossProfit'), lOP=lv('opProfit');
   var gpRate=lRev?lGP/lRev:0, opRate=lRev?lOP/lRev:0;
@@ -374,9 +396,12 @@ function render(){
   document.getElementById('pbadge').textContent='2026년 1~'+MON_NM[lmi]+' 누적';
 
   // KPI
-  var dRev=lmi>0?pct(lRev,pv('revenue')):null;
-  var dGP =lmi>0?pct(lGP, pv('grossProfit')):null;
-  var dOP =lmi>0?pct(lOP, pv('opProfit')):null;
+  var dRev=smi>0?pct(lv('revenue'),pv('revenue')):null;
+  var dGP =smi>0?pct(lv('grossProfit'),pv('grossProfit')):null;
+  var dOP =smi>0?pct(lv('opProfit'),pv('opProfit')):null;
+
+  var lRev=lv('revenue'), lGP=lv('grossProfit'), lOP=lv('opProfit');
+  var gpRate=lRev?lGP/lRev:0, opRate=lRev?lOP/lRev:0;
 
   document.getElementById('kpis').innerHTML=[
     {l:'매출액',    v:fmtN(lRev), d:dRev},
@@ -386,7 +411,7 @@ function render(){
     {l:'영업이익률',v:fmtP(opRate),d:null,neg:opRate<0},
   ].map(function(k){
     return '<div class="kpi">'+
-      '<div class="kpi-lbl">'+k.l+' ('+MON_NM[lmi]+')</div>'+
+      '<div class="kpi-lbl">'+k.l+' ('+MON_NM[smi]+')</div>'+
       '<div class="kpi-val" style="'+(k.neg?'color:#dc2626':'')+'">'+k.v+'</div>'+
       (k.d!=null?'<div class="kpi-delta '+dc(k.d)+'">'+arr(k.d)+' '+fmtD(k.d)+' 전월比</div>':'')+
       '</div>';
@@ -423,9 +448,9 @@ function render(){
 
   // 전월 대비
   document.getElementById('delta-title').textContent=
-    lmi>0?'전월 대비 증감 ('+MON_NM[lmi-1]+' → '+MON_NM[lmi]+')':'전월 대비 증감';
+    smi>0?'전월 대비 증감 ('+MON_NM[smi-1]+' → '+MON_NM[smi]+')':'전월 대비 증감';
 
-  if(lmi>0){
+  if(smi>0){
     var dRows=[
       {nm:'매출액',    l:lv('revenue'),    p:pv('revenue'),    inv:false},
       {nm:'매출이익',  l:lv('grossProfit'),p:pv('grossProfit'),inv:false},
@@ -436,7 +461,7 @@ function render(){
     ];
     document.getElementById('delta-body').innerHTML=
       '<div class="twrap"><table>'+
-      '<thead><tr><th>항목</th><th>'+MON_NM[lmi-1]+'</th><th>'+MON_NM[lmi]+'</th><th>증감</th><th>증감률</th></tr></thead>'+
+      '<thead><tr><th>항목</th><th>'+MON_NM[smi-1]+'</th><th>'+MON_NM[smi]+'</th><th>증감</th><th>증감률</th></tr></thead>'+
       '<tbody>'+dRows.map(function(r){
         var d=r.l-r.p, pp=pct(r.l,r.p);
         var cls=r.inv?dc(-d):dc(d);
@@ -451,8 +476,8 @@ function render(){
   }
 
   // 채널 파이
-  var chRevV=[D.ch_d2c,D.ch_b2b,D.ch_b2c,D.ch_store,D.ch_exp].map(function(a){return Math.round(M(a[lmi]));});
-  var chGPV=[D.gp_d2c,D.gp_b2b,D.gp_b2c,D.gp_store,D.gp_exp].map(function(a){return Math.round(M(a[lmi]));});
+  var chRevV=[D.ch_d2c,D.ch_b2b,D.ch_b2c,D.ch_store,D.ch_exp].map(function(a){return Math.round(M(a[smi]));});
+  var chGPV=[D.gp_d2c,D.gp_b2b,D.gp_b2c,D.gp_store,D.gp_exp].map(function(a){return Math.round(M(a[smi]));});
   var chRevT=chRevV.reduce(function(a,b){return a+b;},0);
   var chGPT=chGPV.reduce(function(a,b){return a+Math.max(b,0);},0);
 
@@ -493,7 +518,7 @@ function render(){
   });
 
   // 판관비 파이
-  var costV=[D.labor,D.brand,D.fee,D.otherCst,D.depr].map(function(a){return Math.round(Math.abs(M(a[lmi])));});
+  var costV=[D.labor,D.brand,D.fee,D.otherCst,D.depr].map(function(a){return Math.round(Math.abs(M(a[smi])));});
   var costT=costV.reduce(function(a,b){return a+b;},0);
   mkChart('c-cost-pie',{
     type:'doughnut',
@@ -586,6 +611,11 @@ function render(){
     :'<div class="empty">업로드된 데이터 없음</div>';
 }
 
+function selectMonth(mi){
+  selectedMi=mi;
+  render();
+}
+
 async function handleReset(){
   if(!confirm('모든 데이터를 초기화할까요?')) return;
   try{
@@ -620,6 +650,7 @@ dz.addEventListener('drop',function(e){
 dz.addEventListener('click',function(){document.getElementById('finput').click();});
 
 window.handleReset=handleReset;
+window.selectMonth=selectMonth;
 
 // 초기 로드
 (async function(){
