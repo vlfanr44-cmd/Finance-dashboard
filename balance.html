@@ -66,6 +66,11 @@ tr:last-child td{border-bottom:none}
 .toast.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
 .toast.err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
 .toast.info{background:#fff;color:#1a1a1a;border:1px solid #e8e8e4}
+.mon-bar{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.mon-lbl{font-size:11px;color:#999;font-weight:600;margin-right:4px;white-space:nowrap}
+.mon-btn{font-size:11px;font-weight:500;padding:4px 11px;border-radius:6px;border:1px solid #e8e8e4;background:#fff;color:#888;cursor:pointer;transition:all .15s}
+.mon-btn:hover{border-color:#2563EB;color:#2563EB}
+.mon-btn.on{background:#2563EB;color:#fff;border-color:#2563EB}
 @media(max-width:768px){.kpi-grid{grid-template-columns:1fr 1fr}.g2,.g3{grid-template-columns:1fr}.ratio-grid{grid-template-columns:1fr 1fr}}
 </style>
 </head>
@@ -98,6 +103,9 @@ tr:last-child td{border-bottom:none}
   </div>
 
   <div id="main" style="display:none">
+    <div class="mon-bar" id="mon-bar">
+      <span class="mon-lbl">월 선택:</span>
+    </div>
     <div class="kpi-grid" id="kpis"></div>
     <div class="tabs">
       <button class="tab on" data-t="overview">재무 현황</button>
@@ -221,6 +229,7 @@ const API = 'https://script.google.com/macros/s/AKfycbxft4SwgXRNwuSSD04Oeb8cn8WR
 
 let allData = []; // [{period, label, data}]
 let charts = {}, curTab = 'overview';
+let selectedPeriod = null; // 선택된 기간 (null이면 최근 월)
 
 const B  = v => Math.round((v||0)/1e8*10)/10;   // 원→억원 (소수1자리)
 const fmtB = v => B(v).toLocaleString()+'억';
@@ -375,6 +384,7 @@ async function handleFile(file){
 
     await apiSave('__data_bs__', stored);
     allData=stored;
+    selectedPeriod=null;
     render();
     toast(period+' 재무상태표 업로드 완료 ✓');
   }catch(err){
@@ -400,15 +410,32 @@ function render(){
   document.getElementById('main').style.display=has?'block':'none';
   if(!has) return;
 
-  const latest=allData[allData.length-1];
+  // 선택된 기간이 없거나 유효하지 않으면 최근 월로 초기화
+  if(!selectedPeriod || !allData.find(d=>d.period===selectedPeriod)){
+    selectedPeriod=allData[allData.length-1].period;
+  }
+
+  // 선택된 월 데이터
+  const selIdx=allData.findIndex(d=>d.period===selectedPeriod);
+  const latest=allData[selIdx];
+  const prev=selIdx>0?allData[selIdx-1]:null;
   const L=latest.data;
-  const prev=allData[allData.length-2];
   const P=prev?prev.data:null;
+
+  // ── 월 선택 바 ──
+  document.getElementById('mon-bar').innerHTML=
+    '<span class="mon-lbl">월 선택:</span>'+
+    allData.map(function(d){
+      var mon=d.period.split('.')[1];
+      var label=parseInt(mon)+'월';
+      return '<button class="mon-btn'+(d.period===selectedPeriod?' on':'')+
+        '" onclick="selectPeriod(\''+d.period+'\')">'+label+'</button>';
+    }).join('');
 
   document.getElementById('pbadge').textContent=
     allData.length>1
-      ? allData[0].period+' ~ '+latest.period+' · '+allData.length+'개월'
-      : latest.period+' 기준';
+      ? allData[0].period+' ~ '+allData[allData.length-1].period+' · '+allData.length+'개월 · '+selectedPeriod+' 기준'
+      : selectedPeriod+' 기준';
 
   // ── KPI ──────────────────────────────────────────────
   document.getElementById('kpis').innerHTML=[
@@ -628,6 +655,11 @@ function render(){
     </div>`).join('');
 }
 
+function selectPeriod(period){
+  selectedPeriod=period;
+  render();
+}
+
 async function handleReset(){
   if(!confirm('재무상태표 데이터를 모두 초기화할까요?')) return;
   try{
@@ -673,6 +705,7 @@ dz.addEventListener('click',()=>document.getElementById('finput').click());
 
 window.handleReset=handleReset;
 window.handleDeleteMonth=handleDeleteMonth;
+window.selectPeriod=selectPeriod;
 
 // ── 초기 로드 ─────────────────────────────────────────────
 (async()=>{
