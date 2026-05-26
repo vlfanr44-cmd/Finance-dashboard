@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>재무 분석 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;font-size:14px}
+  .topbar{background:#fff;border-bottom:1px solid #e8e8e4;padding:0 2rem;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+  .topbar-title{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .topbar-title span{font-size:20px}
+  .topbar-right{display:flex;align-items:center;gap:10px}
+  .badge{font-size:11px;padding:3px 10px;border-radius:20px;background:#f0f0ec;color:#666;border:1px solid #e0e0dc}
+  .btn{font-size:13px;font-weight:500;padding:7px 14px;border-radius:8px;border:1.5px solid #d0d0cc;background:#fff;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .15s}
+  .btn:hover{background:#f5f5f3;border-color:#b0b0ac}
+  .btn-primary{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+  .btn-primary:hover{background:#333;border-color:#333}
+  .btn-sm{font-size:11px;padding:4px 10px;border-radius:6px}
+  .container{max-width:1100px;margin:0 auto;padding:2rem 1.5rem}
+  .drop-zone{border:2px dashed #d0d0cc;border-radius:12px;padding:3rem 2rem;text-align:center;cursor:pointer;background:#fff;margin-bottom:1.5rem;transition:all .15s}
+  .drop-zone:hover,.drop-zone.drag{border-color:#1a1a1a;background:#f9f9f7}
+  .drop-icon{font-size:36px;margin-bottom:12px}
+  .drop-title{font-size:15px;font-weight:500;margin-bottom:6px}
+  .drop-sub{font-size:12px;color:#888}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:1.5rem}
+  .card{background:#fff;border-radius:10px;padding:1.1rem 1.25rem;border:1px solid #e8e8e4}
+  .card-lbl{font-size:11px;color:#888;margin-bottom:6px;font-weight:500;letter-spacing:.3px}
+  .card-val{font-size:22px;font-weight:700;letter-spacing:-.5px}
+  .card-delta{font-size:11px;margin-top:5px;font-weight:500}
+  .up{color:#1a9e75}.dn{color:#e05a30}.muted{color:#aaa}
+  .tabs{display:flex;gap:2px;margin-bottom:1.25rem;background:#fff;border:1px solid #e8e8e4;border-radius:10px;padding:4px;width:fit-content}
+  .tab{font-size:12px;font-weight:500;padding:6px 14px;border-radius:7px;border:none;background:transparent;color:#888;cursor:pointer;transition:all .15s}
+  .tab.on{background:#1a1a1a;color:#fff}
+  .panel{background:#fff;border-radius:12px;border:1px solid #e8e8e4;padding:1.5rem;margin-bottom:1rem}
+  .panel-ttl{font-size:13px;font-weight:600;color:#444;margin-bottom:1rem}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:#666;margin-bottom:12px}
+  .leg{display:flex;align-items:center;gap:5px}
+  .leg-dot{width:10px;height:10px;border-radius:3px}
+  .tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .tbl th{background:#f5f5f3;font-weight:600;font-size:11px;color:#888;padding:8px 12px;border-bottom:1px solid #e8e8e4;text-align:right;letter-spacing:.3px}
+  .tbl th:first-child{text-align:left}
+  .tbl td{padding:9px 12px;border-bottom:1px solid #f0f0ec;text-align:right;font-variant-numeric:tabular-nums}
+  .tbl td:first-child{text-align:left;font-weight:500}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl tr:hover td{background:#fafaf8}
+  .data-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f9f9f7;border-radius:8px;margin-bottom:6px;border:1px solid #eeeeea;gap:8px;flex-wrap:wrap}
+  .empty{text-align:center;padding:3rem 1rem;color:#aaa;font-size:13px}
+  .loading{text-align:center;padding:4rem;color:#aaa;font-size:13px}
+  .toast{position:fixed;top:70px;right:1.5rem;z-index:999;font-size:13px;font-weight:500;padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .3s;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.1)}
+  .toast.show{opacity:1}
+  .toast.ok{background:#e8f5ee;color:#1a6e45;border:1px solid #b8dfc8}
+  .toast.err{background:#fdecea;color:#9b2c2c;border:1px solid #f5bcbc}
+  .toast.info{background:#fff;color:#444;border:1px solid #e0e0dc}
+  @media(max-width:600px){.container{padding:1rem}.topbar{padding:0 1rem}.cards{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title"><span>📊</span> 재무 분석 대시보드</div>
+  <div class="topbar-right">
+    <span class="badge" id="hdr-badge">데이터 없음</span>
+    <label class="btn btn-primary" id="upload-btn" style="cursor:pointer">
+      <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none">
+      ↑ 엑셀 업로드
+    </label>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="container">
+  <div id="loading" class="loading">데이터 불러오는 중...</div>
+
+  <div id="drop-zone" class="drop-zone" style="display:none">
+    <div class="drop-icon">📂</div>
+    <div class="drop-title">엑셀 파일을 여기에 드래그하거나 위 버튼으로 업로드</div>
+    <div class="drop-sub">매월 손익계산서를 업로드하면 자동으로 누적 집계됩니다<br>파일명에 2025.05 형태 포함 권장 · 실적+예산 시트 분리 시 예산 비교 활성화</div>
+  </div>
+
+  <div id="main" style="display:none">
+    <div class="cards" id="cards"></div>
+    <div class="tabs" id="tabs">
+      <button class="tab on" data-tab="trend">월별 추이</button>
+      <button class="tab" data-tab="budget">예산 vs 실적</button>
+      <button class="tab" data-tab="delta">전월 대비</button>
+      <button class="tab" data-tab="items">항목별 비중</button>
+      <button class="tab" data-tab="manage">데이터 관리</button>
+    </div>
+
+    <div id="panel-trend" class="panel">
+      <div class="panel-ttl">월별 매출 · 비용 · 영업이익 추이</div>
+      <div class="legend">
+        <div class="leg"><div class="leg-dot" style="background:#378ADD"></div>매출</div>
+        <div class="leg"><div class="leg-dot" style="background:#E05A30"></div>비용</div>
+        <div class="leg"><div class="leg-dot" style="background:#1a9e75"></div>영업이익</div>
+      </div>
+      <div style="position:relative;width:100%;height:280px">
+        <canvas id="chart-trend" role="img" aria-label="월별 추이 차트">월별 추이 차트</canvas>
+      </div>
+    </div>
+
+    <div id="panel-budget" class="panel" style="display:none">
+      <div class="panel-ttl">예산 vs 실적 비교</div>
+      <div class="legend">
+        <div class="leg"><div class="leg-dot" style="background:#7F77DD"></div>예산</div>
+        <div class="leg"><div class="leg-dot" style="background:#378ADD"></div>실적</div>
+      </div>
+      <div id="budget-content"></div>
+    </div>
+
+    <div id="panel-delta" class="panel" style="display:none">
+      <div class="panel-ttl" id="delta-ttl">전월 대비 증감</div>
+      <div id="delta-content"></div>
+    </div>
+
+    <div id="panel-items" class="panel" style="display:none">
+      <div class="panel-ttl" id="items-ttl">비용 항목별 비중</div>
+      <div id="items-content"></div>
+    </div>
+
+    <div id="panel-manage" class="panel" style="display:none">
+      <div class="panel-ttl">저장된 월별 데이터</div>
+      <div id="manage-list"></div>
+      <p style="font-size:11px;color:#aaa;margin-top:12px">💡 같은 월 재업로드 시 자동으로 덮어씁니다.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbxft4SwgXRNwuSSD04Oeb8cn8WRoZo_eFq-8CnvoHbK01QZ-LbstqUYX0K3oc2BoPg/exec';
+const PIE_COLORS = ['#378ADD','#7F77DD','#E05A30','#1a9e75','#BA7517','#D4537E','#888780'];
+let allData = [];
+let trendChart, budgetChart;
+let currentTab = 'trend';
+
+// ── 유틸 ──────────────────────────────────────────
+function fmtW(n){ if(n==null||isNaN(n)||n==='') return '-'; return (n<0?'-':'')+'₩'+Math.abs(Math.round(n)).toLocaleString()+'만'; }
+function fmtP(v){ if(v==null||isNaN(v)||!isFinite(v)) return '-'; return (v>0?'+':'')+v.toFixed(1)+'%'; }
+function pct(a,b){ return b?((a-b)/Math.abs(b)*100):null; }
+function dc(v){ return v>0?'up':v<0?'dn':'muted'; }
+function arrow(v,inv){ const good=inv?v<=0:v>=0; return `<span class="${good?'up':'dn'}">${good?'▲':'▼'} ${fmtP(v)} 전월比</span>`; }
+
+function toast(msg, type='ok'){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + type;
+  clearTimeout(t._tid);
+  t._tid = setTimeout(()=>t.className='toast', 3000);
+}
+
+// ── API 통신 ──────────────────────────────────────
+async function apiGet(){
+  const res = await fetch(API + '?action=get');
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error);
+  return json.data;
+}
+
+async function apiSave(month, data){
+  const res = await fetch(API, {
+    method:'POST',
+    body: JSON.stringify({action:'save', month, data})
+  });
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error);
+  return json;
+}
+
+async function apiDelete(month){
+  const res = await fetch(API, {
+    method:'POST',
+    body: JSON.stringify({action:'delete', month})
+  });
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error);
+  return json;
+}
+
+// ── 엑셀 파싱 ─────────────────────────────────────
+function parseFile(file){
+  return new Promise((res,rej)=>{
+    const rd = new FileReader();
+    rd.onload = e => {
+      try{
+        const wb = XLSX.read(e.target.result,{type:'binary'});
+        const out = {};
+        wb.SheetNames.forEach(n=>{ out[n]=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1}); });
+        res(out);
+      }catch(err){rej(err);}
+    };
+    rd.onerror = rej;
+    rd.readAsBinaryString(file);
+  });
+}
+
+function extractData(sheets){
+  const keys = Object.keys(sheets);
+  const aKey = keys.find(k=>/실적|actual|income|손익/i.test(k)) || keys[0];
+  const bKey = keys.find(k=>/예산|budget|plan/i.test(k) && k!==aKey);
+
+  function parseSheet(rows){
+    const d = {};
+    (rows||[]).forEach(row=>{
+      const lbl = String(row[0]||'').trim();
+      if(!lbl) return;
+      const nums = row.slice(1).map(v=>typeof v==='number'?v:parseFloat(v)).filter(v=>!isNaN(v));
+      if(nums.length) d[lbl] = nums[nums.length-1];
+    });
+    return d;
+  }
+
+  const act = parseSheet(sheets[aKey]);
+  const bud = bKey ? parseSheet(sheets[bKey]) : {};
+
+  const rk = Object.keys(act).find(k=>/매출|revenue|sales/i.test(k));
+  const ck = Object.keys(act).find(k=>/비용|cost|expense/i.test(k));
+  const pk = Object.keys(act).find(k=>/이익|profit/i.test(k));
+
+  const revenue = rk ? act[rk] : null;
+  const cost = ck ? act[ck] : null;
+  const profit = pk ? act[pk] : (revenue!=null&&cost!=null ? revenue-cost : null);
+  const budRevenue = rk && bud[rk] ? bud[rk] : null;
+  const budCost = ck && bud[ck] ? bud[ck] : null;
+
+  const items = Object.entries(act)
+    .filter(([k])=>k!==rk&&k!==ck&&k!==pk)
+    .map(([name,cur])=>({name,cur})).slice(0,7);
+
+  return {revenue, cost, profit, budRevenue, budCost, items};
+}
+
+// ── 파일 업로드 처리 ──────────────────────────────
+async function handleFile(file){
+  const btn = document.getElementById('upload-btn');
+  btn.style.opacity = '.5';
+  btn.style.pointerEvents = 'none';
+  toast('업로드 중...', 'info');
+
+  try{
+    const sheets = await parseFile(file);
+    const data = extractData(sheets);
+    const m = file.name.match(/(\d{4})[._\-]?(\d{2})/);
+    const now = new Date();
+    const month = m ? `${m[1]}.${m[2]}` : `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}`;
+
+    await apiSave(month, data);
+    allData = await apiGet();
+    render();
+    toast(`${month} 저장 완료 ✓`);
+  }catch(err){
+    toast('오류: ' + err.message, 'err');
+  }
+
+  btn.style.opacity = '';
+  btn.style.pointerEvents = '';
+  document.getElementById('file-input').value = '';
+}
+
+async function handleDelete(month){
+  if(!confirm(`${month} 데이터를 삭제할까요?`)) return;
+  try{
+    await apiDelete(month);
+    allData = await apiGet();
+    render();
+    toast(`${month} 삭제 완료`);
+  }catch(err){
+    toast('삭제 오류: '+err.message,'err');
+  }
+}
+
+// ── 렌더링 ────────────────────────────────────────
+function render(){
+  const has = allData.length > 0;
+  document.getElementById('drop-zone').style.display = has ? 'none' : 'block';
+  document.getElementById('main').style.display = has ? 'block' : 'none';
+  document.getElementById('hdr-badge').textContent = has
+    ? `${allData[0].month} ~ ${allData[allData.length-1].month} · ${allData.length}개월`
+    : '데이터 없음';
+  if(!has) return;
+
+  const latest = allData[allData.length-1];
+  const prev = allData[allData.length-2];
+
+  renderCards(latest, prev);
+  renderTrend();
+  renderBudget();
+  renderDelta(latest, prev);
+  renderItems(latest);
+  renderManage();
+  switchTab(currentTab);
+}
+
+function renderCards(l, p){
+  const margin = l.revenue ? (l.profit/l.revenue*100) : null;
+  const pMargin = p&&p.revenue ? (p.profit/p.revenue*100) : null;
+  const achieve = l.budRevenue ? (l.revenue/l.budRevenue*100) : null;
+
+  const defs = [
+    {lbl:'매출', val:fmtW(l.revenue), d:p?pct(l.revenue,p.revenue):null, inv:false},
+    {lbl:'비용', val:fmtW(l.cost), d:p?pct(l.cost,p.cost):null, inv:true},
+    {lbl:'영업이익', val:fmtW(l.profit), d:p?pct(l.profit,Math.abs(p.profit||1)):null, inv:false},
+    {lbl:'영업이익률', val:margin!=null?margin.toFixed(1)+'%':'-', d:margin!=null&&pMargin!=null?margin-pMargin:null, inv:false, abs:true},
+    {lbl:'예산달성률', val:achieve!=null?achieve.toFixed(1)+'%':'-', d:null},
+  ];
+
+  document.getElementById('cards').innerHTML = defs.map(c=>`
+    <div class="card">
+      <div class="card-lbl">${c.lbl} (${allData[allData.length-1].month})</div>
+      <div class="card-val">${c.val}</div>
+      ${c.d!=null ? `<div class="card-delta">${arrow(c.d,c.inv)}</div>` : ''}
+    </div>`).join('');
+}
+
+function renderTrend(){
+  const labels = allData.map(d=>d.month.slice(2));
+  const rev = allData.map(d=>+d.revenue||0);
+  const cost = allData.map(d=>+d.cost||0);
+  const profit = allData.map(d=>+d.profit||0);
+
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('chart-trend'),{
+    type:'bar',
+    data:{labels, datasets:[
+      {type:'line',label:'매출',data:rev,borderColor:'#378ADD',backgroundColor:'transparent',borderWidth:2.5,pointRadius:4,tension:.35,order:1},
+      {type:'line',label:'비용',data:cost,borderColor:'#E05A30',backgroundColor:'transparent',borderWidth:2.5,pointRadius:4,tension:.35,borderDash:[5,3],order:2},
+      {type:'bar',label:'영업이익',data:profit,backgroundColor:profit.map(v=>v>=0?'#1a9e7555':'#E05A3055'),borderRadius:4,order:3},
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtW(ctx.raw)}}},
+      scales:{
+        x:{ticks:{font:{size:11},autoSkip:false,maxRotation:45},grid:{display:false}},
+        y:{ticks:{font:{size:11},callback:v=>v?.toLocaleString()+'만'},grid:{color:'rgba(0,0,0,0.05)'}},
+      }
+    }
+  });
+}
+
+function renderBudget(){
+  const bc = document.getElementById('budget-content');
+  const hasBud = allData.some(d=>d.budRevenue);
+  if(!hasBud){
+    bc.innerHTML = '<div class="empty">예산 시트가 있는 파일을 업로드하면 자동으로 비교됩니다.<br><small style="color:#bbb">시트명에 "예산" 또는 "budget" 포함 필요</small></div>';
+    return;
+  }
+  bc.innerHTML = `
+    <div style="position:relative;width:100%;height:240px">
+      <canvas id="chart-budget" role="img" aria-label="예산 대비 실적 차트">예산 vs 실적 차트</canvas>
+    </div>
+    <div style="margin-top:1.25rem;overflow:auto">
+      <table class="tbl">
+        <thead><tr><th style="text-align:left">월</th><th>실적</th><th>예산</th><th>달성률</th></tr></thead>
+        <tbody>${allData.map(d=>{
+          const ach = d.budRevenue?+(+d.revenue/+d.budRevenue*100).toFixed(1):null;
+          return `<tr><td>${d.month}</td><td>${fmtW(d.revenue)}</td>
+            <td style="color:#888">${d.budRevenue?fmtW(d.budRevenue):'-'}</td>
+            <td class="${ach>=100?'up':ach?'dn':'muted'}" style="font-weight:600">${ach!=null?ach+'%':'-'}</td></tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
+
+  if(budgetChart) budgetChart.destroy();
+  budgetChart = new Chart(document.getElementById('chart-budget'),{
+    type:'bar',
+    data:{
+      labels:allData.map(d=>d.month.slice(2)),
+      datasets:[
+        {label:'예산',data:allData.map(d=>+d.budRevenue||0),backgroundColor:'#7F77DD44',borderRadius:4},
+        {label:'실적',data:allData.map(d=>+d.revenue||0),backgroundColor:'#378ADD',borderRadius:4},
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtW(ctx.raw)}}},
+      scales:{
+        x:{ticks:{font:{size:11},autoSkip:false,maxRotation:45},grid:{display:false}},
+        y:{ticks:{font:{size:11},callback:v=>v?.toLocaleString()+'만'},grid:{color:'rgba(0,0,0,0.05)'}},
+      }
+    }
+  });
+}
+
+function renderDelta(l, p){
+  const el = document.getElementById('delta-content');
+  document.getElementById('delta-ttl').textContent = p
+    ? `전월 대비 증감 (${p.month} → ${l.month})`
+    : '전월 대비 증감';
+
+  if(!p){
+    el.innerHTML='<div class="empty">전월 대비 분석을 위해 최소 2개월 데이터가 필요합니다.</div>';
+    return;
+  }
+
+  const rows=[
+    {name:'매출',cur:+l.revenue,prev:+p.revenue},
+    {name:'비용',cur:+l.cost,prev:+p.cost},
+    {name:'영업이익',cur:+l.profit,prev:+p.profit},
+  ];
+
+  const dvals = rows.map(r=>pct(r.cur,r.prev)||0);
+
+  el.innerHTML = `
+    <div style="overflow:auto;margin-bottom:1.25rem">
+      <table class="tbl">
+        <thead><tr><th style="text-align:left">항목</th><th>전월</th><th>이번달</th><th>증감</th><th>증감률</th></tr></thead>
+        <tbody>${rows.map(r=>{
+          const d=r.cur-r.prev; const pp=pct(r.cur,r.prev);
+          return `<tr><td>${r.name}</td><td style="color:#888">${fmtW(r.prev)}</td><td>${fmtW(r.cur)}</td>
+            <td class="${dc(d)}">${d>=0?'+':''}${fmtW(d)}</td>
+            <td class="${dc(d)}" style="font-weight:600">${fmtP(pp)}</td></tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
+    <div style="position:relative;width:100%;height:${rows.length*52+80}px">
+      <canvas id="chart-delta" role="img" aria-label="전월 대비 증감률 차트">전월 대비 차트</canvas>
+    </div>`;
+
+  new Chart(document.getElementById('chart-delta'),{
+    type:'bar',
+    data:{
+      labels:rows.map(r=>r.name),
+      datasets:[{data:dvals,backgroundColor:dvals.map(v=>v>=0?'#1a9e75':'#E05A30'),borderRadius:4}]
+    },
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmtP(ctx.raw)}}},
+      scales:{
+        x:{ticks:{font:{size:11},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,0.05)'}},
+        y:{ticks:{font:{size:12}},grid:{display:false}},
+      }
+    }
+  });
+}
+
+function renderItems(l){
+  const el = document.getElementById('items-content');
+  document.getElementById('items-ttl').textContent = `비용 항목별 비중 (${l.month})`;
+  const items = Array.isArray(l.items) ? l.items : [];
+  if(!items.length){
+    el.innerHTML='<div class="empty">세부 항목 데이터가 감지되지 않았습니다.</div>';
+    return;
+  }
+  const total = items.reduce((s,i)=>s+(+i.cur||0),0);
+  el.innerHTML = `
+    <div style="display:flex;gap:2rem;align-items:center;flex-wrap:wrap">
+      <div style="position:relative;width:180px;height:180px;flex-shrink:0">
+        <canvas id="chart-items" role="img" aria-label="항목별 비중 도넛 차트">항목 비중 차트</canvas>
+      </div>
+      <div style="flex:1;min-width:160px">
+        ${items.map((it,i)=>{
+          const p = total?(+it.cur/total*100).toFixed(1):'-';
+          return `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;align-items:center">
+            <span style="display:flex;align-items:center;gap:6px">
+              <span style="width:9px;height:9px;border-radius:2px;background:${PIE_COLORS[i]};display:inline-block"></span>${it.name}
+            </span>
+            <span style="color:#888;font-variant-numeric:tabular-nums">${fmtW(+it.cur)} · ${p}%</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  new Chart(document.getElementById('chart-items'),{
+    type:'doughnut',
+    data:{labels:items.map(i=>i.name),datasets:[{data:items.map(i=>+i.cur),backgroundColor:PIE_COLORS.slice(0,items.length),borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.label+': '+(+ctx.raw/total*100).toFixed(1)+'%'}}}}
+  });
+}
+
+function renderManage(){
+  document.getElementById('manage-list').innerHTML = allData.length
+    ? allData.map(d=>`
+      <div class="data-row">
+        <span style="font-weight:600">${d.month}</span>
+        <span style="color:#888;font-size:12px">매출 ${fmtW(d.revenue)} · 이익 ${fmtW(d.profit)}</span>
+        <button class="btn btn-sm" onclick="handleDelete('${d.month}')" style="color:#c0392b;border-color:#e0b0b0">삭제</button>
+      </div>`).join('')
+    : '<div class="empty">저장된 데이터 없음</div>';
+}
+
+function switchTab(id){
+  currentTab = id;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===id));
+  ['trend','budget','delta','items','manage'].forEach(t=>{
+    document.getElementById('panel-'+t).style.display = t===id ? 'block' : 'none';
+  });
+}
+
+// ── 이벤트 ────────────────────────────────────────
+document.getElementById('tabs').addEventListener('click', e=>{
+  const b = e.target.closest('.tab');
+  if(b) switchTab(b.dataset.tab);
+});
+
+document.getElementById('file-input').addEventListener('change', e=>{
+  if(e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
+dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('drag'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+// ── 초기 로드 ─────────────────────────────────────
+(async()=>{
+  try{
+    allData = await apiGet();
+    document.getElementById('loading').style.display = 'none';
+    render();
+  }catch(err){
+    document.getElementById('loading').innerHTML = '⚠️ 데이터 로드 실패: '+err.message+'<br><small>Apps Script 배포 설정을 확인해주세요.</small>';
+  }
+})();
+</script>
+</body>
+</html>
