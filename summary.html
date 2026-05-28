@@ -281,49 +281,57 @@ function render(PL, BS, CF){
   document.getElementById('main').style.display='block';
 
   // ── 월 선택 바 ──────────────────────────────────────
-  const maxMi = PL ? PL.lastMonthIdx : (CF ? CF.lastMi : 0);
-  if(selectedMi < 0 || selectedMi > maxMi) selectedMi = maxMi;
-  const smi = selectedMi;
-
-  // 월 라벨 (손익 기준, 없으면 현금흐름 기준)
-  const getMonLabel = (i) => {
-    if(CF && CF.months && CF.months[i]) {
-      const parts = CF.months[i].split('.');
-      return parts[1] ? parseInt(parts[1])+'월' : CF.months[i];
+  // CF 기준 월 목록 (연도 없는 첫 항목 제외)
+  // CF months: [".12", "25.01", ..., "26.04"] → 연도 있는 것만 사용
+  const validMonths = [];
+  if(CF){
+    CF.months.forEach((m,i)=>{
+      const yr = CF.yearLabels[i];
+      if(yr && yr.length>=4) validMonths.push({idx:i, month:m, year:yr});
+    });
+  } else if(PL){
+    for(let i=0;i<=PL.lastMonthIdx;i++){
+      validMonths.push({idx:i, month:(i+1)+'월', year:'2026'});
     }
-    return (i+1)+'월';
-  };
-  const getYearLabel = (i) => {
-    if(CF && CF.yearLabels && CF.yearLabels[i]) return CF.yearLabels[i];
-    return '2026';
-  };
+  }
+
+  const maxVmi = validMonths.length-1;
+  if(selectedMi < 0 || selectedMi > maxVmi) selectedMi = maxVmi;
+  const smi = selectedMi; // validMonths 기준 인덱스
+  const cfIdx = validMonths[smi] ? validMonths[smi].idx : 0; // CF 배열 실제 인덱스
 
   // 월 선택 바 렌더링 (연도 그룹핑)
   (function(){
     let barHtml = '<span class="mon-lbl">월 선택:</span>';
     let prevYear = null;
-    for(let i=0; i<=maxMi; i++){
-      const yr = getYearLabel(i);
-      const mo = getMonLabel(i);
+    validMonths.forEach((vm,vi)=>{
+      const yr = vm.year;
+      const parts = vm.month.split('.');
+      const mo = parts[1] ? parseInt(parts[1])+'월' : vm.month;
       if(yr && yr !== prevYear){
         if(prevYear !== null) barHtml += '<div class="mon-sep"></div>';
         barHtml += `<span class="year-lbl">${yr}</span>`;
         prevYear = yr;
       }
-      barHtml += `<button class="mon-btn${i===smi?' on':''}" onclick="selectMonth(${i})">${mo}</button>`;
-    }
+      barHtml += `<button class="mon-btn${vi===smi?' on':''}" onclick="selectMonth(${vi})">${mo}</button>`;
+    });
     document.getElementById('mon-bar').innerHTML = barHtml;
   })();
 
   // ── 데이터 추출 ──────────────────────────────────────
-  // 손익 선택 월
+  // 손익 인덱스: validMonths의 year='2026'인 것만 PL과 매핑
+  // PL은 2026년 1~4월 = 인덱스 0~3
   const plLmi  = PL ? PL.lastMonthIdx : null;
-  const plSmi  = PL ? Math.min(smi, plLmi) : null; // 손익은 lastMonthIdx까지만
+  // 선택된 월이 2026년이면 PL 인덱스 계산, 아니면 null
+  const selVM = validMonths[smi];
+  const plSmi = PL && selVM && selVM.year==='2026'
+    ? Math.min(parseInt(selVM.month.split('.')[1]||'1')-1, plLmi)
+    : (PL ? plLmi : null); // 2026년 아닌 월 선택 시 최근 PL값 표시
   const plRev  = PL ? M(PL.revenue[plSmi])  : null;
   const plGP   = PL ? M(PL.grossProfit[plSmi]) : null;
   const plOP   = PL ? M(PL.opProfit[plSmi]) : null;
-  const plGPR  = PL ? PL.grossMargin[plSmi]*100 : null;
-  const plOPR  = PL ? PL.opMargin[plSmi]*100 : null;
+  const plGPR  = PL ? (PL.grossMargin[plSmi]||0)*100 : null;
+  const plOPR  = PL ? (PL.opMargin[plSmi]||0)*100 : null;
   const plRevP = PL&&plSmi>0 ? M(PL.revenue[plSmi-1]) : null;
   const plOPP  = PL&&plSmi>0 ? M(PL.opProfit[plSmi-1]) : null;
 
@@ -333,14 +341,16 @@ function render(PL, BS, CF){
   const debtRatio    = bsL ? bsL.ratio_debtRatio    : null;
   const currentRatio = bsL ? bsL.ratio_currentRatio : null;
 
-  // 현금흐름 선택 월
-  const cfLmi   = CF ? CF.lastMi : null;
-  const cfSmi   = CF ? Math.min(smi, cfLmi) : null;
-  const cashBal = CF ? CF.cashBal[cfSmi] : null;
-  const opCF    = CF ? CF.opCF[cfSmi]    : null;
+  // 현금흐름 선택 월 (cfIdx = CF 배열의 실제 인덱스)
+  const cashBal = CF ? CF.cashBal[cfIdx] : null;
+  const opCF    = CF ? CF.opCF[cfIdx]    : null;
 
   // 기준 월 표시
-  const baseMonth = PL ? `${plSmi+1}월` : CF ? CF.months[cfSmi] : '-';
+  const selLabel = selVM ? (()=>{
+    const parts = selVM.month.split('.');
+    return parts[1] ? selVM.year+'.'+parts[1] : selVM.month;
+  })() : '-';
+  const baseMonth = selLabel;
   document.getElementById('pbadge').textContent = `${baseMonth} 기준`;
 
   // ── KPI 신호등 ────────────────────────────────────────
@@ -386,7 +396,7 @@ function render(PL, BS, CF){
   const runwayEl = document.getElementById('runway-card');
   if(CF && cashBal!=null && opCF!=null){
     // 최근 3개월 평균 영업CF 소진액
-    const recentCFs = CF.opCF.slice(Math.max(0,cfSmi-2), cfSmi+1).filter(v=>v<0);
+    const recentCFs = CF.opCF.slice(Math.max(0,cfIdx-2), cfIdx+1).filter(v=>v<0);
     const avgBurn = recentCFs.length>0 ? Math.abs(recentCFs.reduce((a,b)=>a+b,0)/recentCFs.length) : null;
     const runway = avgBurn>0 ? Math.floor(cashBal/avgBurn) : null;
 
@@ -506,7 +516,7 @@ function render(PL, BS, CF){
 
   if(CF && cashBal!=null){
     const runway = (() => {
-      const recentCFs = CF.opCF.slice(Math.max(0,cfSmi-2), cfSmi+1).filter(v=>v<0);
+      const recentCFs = CF.opCF.slice(Math.max(0,cfIdx-2), cfIdx+1).filter(v=>v<0);
       const avgBurn = recentCFs.length>0 ? Math.abs(recentCFs.reduce((a,b)=>a+b,0)/recentCFs.length) : null;
       return avgBurn>0 ? Math.floor(cashBal/avgBurn) : null;
     })();
@@ -541,7 +551,7 @@ function render(PL, BS, CF){
     const mLabels = Array.from({length:lmi+1},(_,i)=>(i+1)+'월');
     const revData = PL.revenue.slice(0,lmi+1).map(v=>Math.round(M(v)));
     const opData  = PL.opProfit.slice(0,lmi+1).map(v=>Math.round(M(v)));
-    const selMi   = Math.min(smi, lmi);
+    const selMi   = plSmi!=null ? Math.min(plSmi,lmi) : lmi;
 
     mkChart('c-pl',{
       type:'bar',
@@ -563,16 +573,19 @@ function render(PL, BS, CF){
   }
 
   if(CF){
-    const lmi = CF.lastMi;
-    const mLabels = CF.months.slice(0,lmi+1).map(m=>{
-      const parts=m.split('.'); return parts[1]?parseInt(parts[1])+'월':m;
+    const vmLabels = validMonths.map(vm=>{
+      const parts=vm.month.split('.'); return parts[1]?parseInt(parts[1])+'월':vm.month;
     });
+    const vmCash = validMonths.map(vm=>CF.cashBal[vm.idx]||0);
     mkChart('c-cash',{
       type:'line',
-      data:{labels:mLabels,datasets:[{
-        label:'현금잔액',data:CF.cashBal.slice(0,lmi+1),
+      data:{labels:vmLabels,datasets:[{
+        label:'현금잔액',data:vmCash,
         borderColor:'#2E7D52',backgroundColor:'rgba(46,125,82,0.08)',
-        borderWidth:3,pointRadius:4,pointBackgroundColor:'#2E7D52',pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,fill:true,
+        borderWidth:3,
+        pointRadius:vmCash.map((_,i)=>i===smi?7:4),
+        pointBackgroundColor:vmCash.map((_,i)=>i===smi?'#F27B50':'#2E7D52'),
+        pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,fill:true,
       }]},
       options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`현금잔액: ${ctx.raw.toLocaleString()}M`}}},
