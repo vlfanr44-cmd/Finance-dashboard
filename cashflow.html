@@ -78,6 +78,7 @@ tr:last-child td{border-bottom:none}
 .mon-btn{font-size:11px;font-weight:600;padding:5px 13px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:all .2s}
 .mon-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
 .mon-btn.on{background:var(--grad);color:#fff;border-color:transparent;font-weight:700;box-shadow:0 2px 8px rgba(43,78,191,.3)}
+.year-lbl{font-size:10px;font-weight:800;color:var(--blue);background:var(--blue-light);padding:3px 8px;border-radius:5px;letter-spacing:.3px;white-space:nowrap;align-self:center}
 .empty{text-align:center;padding:56px;color:var(--faint);font-size:13px}
 .toast{position:fixed;top:68px;right:18px;z-index:999;font-size:12px;font-weight:700;padding:10px 18px;border-radius:12px;opacity:0;transition:opacity .25s;pointer-events:none;box-shadow:var(--shadow-md)}
 .toast.show{opacity:1}
@@ -278,15 +279,18 @@ function parseCF(rows){
   const yearRow   = rows[2] || [];
   const headerRow = rows[3] || [];
 
-  // 월 라벨 생성 (합계 열 제외)
+  // 월 라벨 생성 (합계 열 제외, 연도 정보 포함)
   const colIndices = [];
   const months = [];
+  const yearLabels = []; // 각 월의 전체 연도 (예: '2024', '2025', '2026')
   let curYear = null;
+  let curYearFull = null;
 
   for(let ci=2; ci<=24; ci++){
     const yr = yearRow[ci];
     if(yr && String(yr).includes('년')){
-      curYear = String(yr).replace(/[^0-9]/g,'').slice(-2); // '2024'→'24', '2026'→'26'
+      curYearFull = String(yr).replace(/[^0-9]/g,''); // '2024', '2025', '2026'
+      curYear = curYearFull.slice(-2); // '24', '25', '26'
     }
     const mo = headerRow[ci];
     if(!mo || String(mo).includes('합계') || String(mo).includes('E')) continue;
@@ -294,6 +298,7 @@ function parseCF(rows){
     if(!moStr) continue;
     colIndices.push(ci);
     months.push((curYear||'')+'.'+moStr.padStart(2,'0'));
+    yearLabels.push(curYearFull||'');
   }
 
   function getRow(label){
@@ -323,6 +328,7 @@ function parseCF(rows){
 
   return {
     months,
+    yearLabels,
     lastMi,
     colCount: colIndices.length,
     // 손익 (행 번호 기준)
@@ -427,12 +433,22 @@ function render(){
   if(selectedMi<0||selectedMi>lmi) selectedMi=lmi;
   const smi=selectedMi;
 
-  // 월 선택 바
-  document.getElementById('mon-bar').innerHTML=
-    '<span class="mon-lbl">월 선택:</span>'+
-    D.months.slice(0,lmi+1).map((m,i)=>`
-      <button class="mon-btn${i===smi?' on':''}" onclick="selectMonth(${i})">${m.split('.')[1]?parseInt(m.split('.')[1])+'월':m}</button>
-    `).join('');
+  // 월 선택 바 - 연도별 그룹핑
+  (function(){
+    let html = '<span class="mon-lbl">월 선택:</span>';
+    let prevYear = null;
+    D.months.slice(0,lmi+1).forEach((m,i)=>{
+      const yr = D.yearLabels[i];
+      const mo = m.split('.')[1]?parseInt(m.split('.')[1])+'월':m;
+      if(yr && yr !== prevYear){
+        if(prevYear !== null) html += '<div class="mon-sep"></div>';
+        html += `<span class="year-lbl">${yr}</span>`;
+        prevYear = yr;
+      }
+      html += `<button class="mon-btn${i===smi?' on':''}" onclick="selectMonth(${i})">${mo}</button>`;
+    });
+    document.getElementById('mon-bar').innerHTML = html;
+  })();
 
   document.getElementById('pbadge').textContent=D.months[smi]||'데이터 없음';
 
