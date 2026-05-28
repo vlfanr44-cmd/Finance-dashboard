@@ -269,70 +269,92 @@ async function apiSave(key,value){
 
 // ── 엑셀 파싱 ────────────────────────────────────────────
 function parseCF(rows){
-  // row4(index 3) = 월 헤더, col[2]~col[15] = 14개월
-  const headerRow = rows[3];
-  const yearRow   = rows[2];
+  // 열 구조:
+  //   col[2]~col[15]: 2024.11 ~ 2025.12 (14개월, 과거)
+  //   col[16]: 합계 (skip)
+  //   col[17]~col[20]: 2026.01 ~ 2026.04 (최근 4개월, 실적)
+  // → 전체 col 인덱스 배열: [2..15, 17..20] = 18개월
 
-  // 월 라벨 생성
+  const yearRow   = rows[2] || [];
+  const headerRow = rows[3] || [];
+
+  // 월 라벨 생성 (합계 열 제외)
+  const colIndices = [];
   const months = [];
   let curYear = null;
-  for(let ci=2; ci<=15; ci++){
+
+  for(let ci=2; ci<=24; ci++){
     const yr = yearRow[ci];
-    if(yr && String(yr).includes('년')) curYear = String(yr).replace('년','').trim();
+    if(yr && String(yr).includes('년')){
+      curYear = String(yr).replace(/[^0-9]/g,'').slice(-2); // '2024'→'24', '2026'→'26'
+    }
     const mo = headerRow[ci];
-    if(mo) months.push((curYear?curYear+'.':'')+String(mo).replace('월','').padStart(2,'0'));
-    else months.push('');
+    if(!mo || String(mo).includes('합계') || String(mo).includes('E')) continue;
+    const moStr = String(mo).replace(/[^0-9]/g,'');
+    if(!moStr) continue;
+    colIndices.push(ci);
+    months.push((curYear||'')+'.'+moStr.padStart(2,'0'));
   }
 
   function getRow(label){
-    return rows.find(r=>String(r[1]||'').trim()===label)||null;
+    // 완전 일치 우선, 없으면 포함 검색
+    return rows.find(r=>String(r[1]||'').trim()===label)
+        || rows.find(r=>String(r[1]||'').trim().includes(label))
+        || null;
   }
+
+  // 채널별 매출은 매출액 다음 4행 (D2C, B2B, B2C, Store)
+  // 매출이익율은 row11, 매출이익은 row17
+  function getRowByIdx(idx){ return rows[idx-1]||null; }
+
   function vals(row){
-    if(!row) return Array(14).fill(0);
-    return Array.from({length:14},(_,i)=>{
-      const v=row[i+2];
-      return typeof v==='number'&&isFinite(v)?v:0;
+    if(!row) return Array(colIndices.length).fill(0);
+    return colIndices.map(ci=>{
+      const v=row[ci];
+      return (typeof v==='number'&&isFinite(v))?v:0;
     });
   }
 
   // 데이터 있는 마지막 월 인덱스
-  const revVals = vals(getRow('매출액'));
+  const revRow = getRowByIdx(5); // row5 = 매출액
+  const revVals = vals(revRow);
   let lastMi = 0;
   revVals.forEach((v,i)=>{ if(v&&v!==0) lastMi=i; });
 
   return {
-    months, lastMi,
-    // 손익
-    revenue:    vals(getRow('매출액')),
-    gpRate:     vals(getRow('매출이익율')),
-    grossProfit:vals(getRow('매출이익')),
-    sga1:       vals(getRow('1차 판관비')),
-    sga2:       vals(getRow('2차 판관비')),
-    opProfit2:  vals(getRow('2차 영업이익')),
-    opRate:     vals(getRow('영업이익율')),
-    netIncome:  vals(getRow('당기순이익')),
-    ebitda:     rows.find(r=>String(r[1]||'').includes('EBITDA'))?vals(rows.find(r=>String(r[1]||'').includes('EBITDA'))):Array(14).fill(0),
-    // 채널별 매출
-    ch_d2c:     vals(getRow('D2C')),
-    ch_b2b:     vals(getRow('B2B')),
-    ch_b2c:     vals(getRow('B2C')),
-    ch_store:   vals(getRow('Store')),
-    // 1차 판관비 세부
-    labor1:     vals(getRow('인건비')),
-    fee:        vals(getRow('판매수수료')),
-    brand:      vals(getRow('브랜드마케팅')),
-    logistics:  vals(getRow('물류비')),
-    store_cost: vals(getRow('매장운영비')),
-    // 현금흐름
-    opCF:       vals(getRow('영업현금흐름(D=A+B-C)')),
-    investCF:   vals(getRow('투자현금흐름')),
-    financeCF:  vals(getRow('재무현금흐름')),
-    cashBal:    vals(getRow('현금잔액')),
-    // 순운전자본
-    wc:         vals(getRow('  순운전자본')),
-    receivable: vals(getRow('매출채권')),
-    inventory:  vals(getRow('재고자산')),
-    payable:    vals(getRow('매입채무(-)')),
+    months,
+    lastMi,
+    colCount: colIndices.length,
+    // 손익 (행 번호 기준)
+    revenue:     vals(getRowByIdx(5)),   // 매출액
+    ch_d2c:      vals(getRowByIdx(6)),   // D2C
+    ch_b2b:      vals(getRowByIdx(7)),   // B2B
+    ch_b2c:      vals(getRowByIdx(8)),   // B2C
+    ch_store:    vals(getRowByIdx(9)),   // Store
+    gpRate:      vals(getRowByIdx(11)),  // 매출이익율
+    grossProfit: vals(getRowByIdx(17)),  // 매출이익
+    sga1:        vals(getRowByIdx(23)),  // 1차 판관비
+    labor1:      vals(getRowByIdx(24)),  // 인건비(1차)
+    fee:         vals(getRowByIdx(25)),  // 판매수수료
+    brand:       vals(getRowByIdx(26)),  // 브랜드마케팅
+    logistics:   vals(getRowByIdx(27)),  // 물류비
+    store_cost:  vals(getRowByIdx(28)),  // 매장운영비
+    opProfit1:   vals(getRowByIdx(30)),  // 1차 영업이익
+    sga2:        vals(getRowByIdx(31)),  // 2차 판관비
+    opProfit2:   vals(getRowByIdx(37)),  // 2차 영업이익
+    opRate:      vals(getRowByIdx(38)),  // 영업이익율
+    netIncome:   vals(getRowByIdx(40)),  // 당기순이익
+    // 현금흐름 (행 번호 기준)
+    opCF:        vals(getRowByIdx(43)),  // 영업현금흐름
+    wcDelta:     vals(getRowByIdx(48)),  // 순운전자본변동
+    wc:          vals(getRowByIdx(49)),  // 순운전자본
+    receivable:  vals(getRowByIdx(50)),  // 매출채권
+    inventory:   vals(getRowByIdx(51)),  // 재고자산
+    payable:     vals(getRowByIdx(52)),  // 매입채무
+    financeCF:   vals(getRowByIdx(55)),  // 재무현금흐름
+    investCF:    vals(getRowByIdx(58)),  // 투자현금흐름
+    cashBal:     vals(getRowByIdx(66)),  // 현금잔액
+    ebitda:      Array(colIndices.length).fill(0), // EBITDA 없음
   };
 }
 
