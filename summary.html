@@ -114,6 +114,13 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .lock-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg)}
 .lock-err{font-size:12px;color:var(--red);margin-top:8px;min-height:16px}
 
+.mon-bar{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:20px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow)}
+.mon-lbl{font-size:11px;color:var(--muted);font-weight:700;margin-right:6px;white-space:nowrap;letter-spacing:.4px}
+.mon-btn{font-size:11px;font-weight:600;padding:5px 13px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;transition:all .2s}
+.mon-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+.mon-btn.on{background:var(--grad);color:#fff;border-color:transparent;font-weight:700;box-shadow:0 2px 8px rgba(43,78,191,.3)}
+.mon-sep{width:1px;height:20px;background:var(--border);margin:0 6px;flex-shrink:0;align-self:center}
+.year-lbl{font-size:10px;font-weight:800;color:var(--blue);background:var(--blue-light);padding:3px 8px;border-radius:5px;letter-spacing:.3px;white-space:nowrap;align-self:center}
 @media(max-width:768px){
   .kpi-grid{grid-template-columns:1fr 1fr}
   .turnover-grid{grid-template-columns:1fr}
@@ -172,6 +179,9 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
   </div>
   <div id="main" style="display:none">
 
+    <!-- 월 선택 바 -->
+    <div class="mon-bar" id="mon-bar"><span class="mon-lbl">월 선택:</span></div>
+
     <!-- KPI 신호등 -->
     <div class="section-title">핵심 경영 지표</div>
     <div class="kpi-grid" id="kpi-grid"></div>
@@ -214,6 +224,7 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 <script>
 const API = 'https://script.google.com/macros/s/AKfycbxft4SwgXRNwuSSD04Oeb8cn8WRoZo_eFq-8CnvoHbK01QZ-LbstqUYX0K3oc2BoPg/exec';
 let charts = {};
+let selectedMi = -1; // 선택된 월 인덱스 (-1이면 최근 월)
 
 // ── 유틸 ──────────────────────────────────────────────────
 const fmtM  = v => v==null?'-':(Math.round(v)).toLocaleString()+'M';
@@ -269,16 +280,52 @@ function render(PL, BS, CF){
   if(!hasAny){ document.getElementById('no-data').style.display='block'; return; }
   document.getElementById('main').style.display='block';
 
+  // ── 월 선택 바 ──────────────────────────────────────
+  const maxMi = PL ? PL.lastMonthIdx : (CF ? CF.lastMi : 0);
+  if(selectedMi < 0 || selectedMi > maxMi) selectedMi = maxMi;
+  const smi = selectedMi;
+
+  // 월 라벨 (손익 기준, 없으면 현금흐름 기준)
+  const getMonLabel = (i) => {
+    if(CF && CF.months && CF.months[i]) {
+      const parts = CF.months[i].split('.');
+      return parts[1] ? parseInt(parts[1])+'월' : CF.months[i];
+    }
+    return (i+1)+'월';
+  };
+  const getYearLabel = (i) => {
+    if(CF && CF.yearLabels && CF.yearLabels[i]) return CF.yearLabels[i];
+    return '2026';
+  };
+
+  // 월 선택 바 렌더링 (연도 그룹핑)
+  (function(){
+    let barHtml = '<span class="mon-lbl">월 선택:</span>';
+    let prevYear = null;
+    for(let i=0; i<=maxMi; i++){
+      const yr = getYearLabel(i);
+      const mo = getMonLabel(i);
+      if(yr && yr !== prevYear){
+        if(prevYear !== null) barHtml += '<div class="mon-sep"></div>';
+        barHtml += `<span class="year-lbl">${yr}</span>`;
+        prevYear = yr;
+      }
+      barHtml += `<button class="mon-btn${i===smi?' on':''}" onclick="selectMonth(${i})">${mo}</button>`;
+    }
+    document.getElementById('mon-bar').innerHTML = barHtml;
+  })();
+
   // ── 데이터 추출 ──────────────────────────────────────
-  // 손익 최근 월
+  // 손익 선택 월
   const plLmi  = PL ? PL.lastMonthIdx : null;
-  const plRev  = PL ? M(PL.revenue[plLmi])  : null;
-  const plGP   = PL ? M(PL.grossProfit[plLmi]) : null;
-  const plOP   = PL ? M(PL.opProfit[plLmi]) : null;
-  const plGPR  = PL ? PL.grossMargin[plLmi]*100 : null;
-  const plOPR  = PL ? PL.opMargin[plLmi]*100 : null;
-  const plRevP = PL&&plLmi>0 ? M(PL.revenue[plLmi-1]) : null;
-  const plOPP  = PL&&plLmi>0 ? M(PL.opProfit[plLmi-1]) : null;
+  const plSmi  = PL ? Math.min(smi, plLmi) : null; // 손익은 lastMonthIdx까지만
+  const plRev  = PL ? M(PL.revenue[plSmi])  : null;
+  const plGP   = PL ? M(PL.grossProfit[plSmi]) : null;
+  const plOP   = PL ? M(PL.opProfit[plSmi]) : null;
+  const plGPR  = PL ? PL.grossMargin[plSmi]*100 : null;
+  const plOPR  = PL ? PL.opMargin[plSmi]*100 : null;
+  const plRevP = PL&&plSmi>0 ? M(PL.revenue[plSmi-1]) : null;
+  const plOPP  = PL&&plSmi>0 ? M(PL.opProfit[plSmi-1]) : null;
 
   // 재무상태표 최근
   const bsL = BS && BS.length>0 ? BS[BS.length-1].data : null;
@@ -286,13 +333,14 @@ function render(PL, BS, CF){
   const debtRatio    = bsL ? bsL.ratio_debtRatio    : null;
   const currentRatio = bsL ? bsL.ratio_currentRatio : null;
 
-  // 현금흐름 최근 월
+  // 현금흐름 선택 월
   const cfLmi   = CF ? CF.lastMi : null;
-  const cashBal = CF ? CF.cashBal[cfLmi] : null;
-  const opCF    = CF ? CF.opCF[cfLmi]    : null;
+  const cfSmi   = CF ? Math.min(smi, cfLmi) : null;
+  const cashBal = CF ? CF.cashBal[cfSmi] : null;
+  const opCF    = CF ? CF.opCF[cfSmi]    : null;
 
   // 기준 월 표시
-  const baseMonth = PL ? `${PL.lastMonthIdx+1}월` : CF ? CF.months[cfLmi] : '-';
+  const baseMonth = PL ? `${plSmi+1}월` : CF ? CF.months[cfSmi] : '-';
   document.getElementById('pbadge').textContent = `${baseMonth} 기준`;
 
   // ── KPI 신호등 ────────────────────────────────────────
@@ -338,7 +386,7 @@ function render(PL, BS, CF){
   const runwayEl = document.getElementById('runway-card');
   if(CF && cashBal!=null && opCF!=null){
     // 최근 3개월 평균 영업CF 소진액
-    const recentCFs = CF.opCF.slice(Math.max(0,cfLmi-2), cfLmi+1).filter(v=>v<0);
+    const recentCFs = CF.opCF.slice(Math.max(0,cfSmi-2), cfSmi+1).filter(v=>v<0);
     const avgBurn = recentCFs.length>0 ? Math.abs(recentCFs.reduce((a,b)=>a+b,0)/recentCFs.length) : null;
     const runway = avgBurn>0 ? Math.floor(cashBal/avgBurn) : null;
 
@@ -458,7 +506,7 @@ function render(PL, BS, CF){
 
   if(CF && cashBal!=null){
     const runway = (() => {
-      const recentCFs = CF.opCF.slice(Math.max(0,cfLmi-2), cfLmi+1).filter(v=>v<0);
+      const recentCFs = CF.opCF.slice(Math.max(0,cfSmi-2), cfSmi+1).filter(v=>v<0);
       const avgBurn = recentCFs.length>0 ? Math.abs(recentCFs.reduce((a,b)=>a+b,0)/recentCFs.length) : null;
       return avgBurn>0 ? Math.floor(cashBal/avgBurn) : null;
     })();
@@ -493,15 +541,20 @@ function render(PL, BS, CF){
     const mLabels = Array.from({length:lmi+1},(_,i)=>(i+1)+'월');
     const revData = PL.revenue.slice(0,lmi+1).map(v=>Math.round(M(v)));
     const opData  = PL.opProfit.slice(0,lmi+1).map(v=>Math.round(M(v)));
+    const selMi   = Math.min(smi, lmi);
 
     mkChart('c-pl',{
       type:'bar',
       data:{labels:mLabels,datasets:[
         {type:'line',label:'매출액',data:revData,
          borderColor:'#2B4EBF',backgroundColor:'rgba(43,78,191,0.07)',
-         borderWidth:3,pointRadius:4,pointBackgroundColor:'#2B4EBF',pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,fill:true,order:1},
+         borderWidth:3,
+         pointRadius:revData.map((_,i)=>i===selMi?7:4),
+         pointBackgroundColor:revData.map((_,i)=>i===selMi?'#F27B50':'#2B4EBF'),
+         pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,fill:true,order:1},
         {label:'영업이익',data:opData,
-         backgroundColor:opData.map(v=>v>=0?'rgba(46,125,82,0.6)':'rgba(217,79,61,0.6)'),borderRadius:5,order:2},
+         backgroundColor:opData.map((v,i)=>i===selMi?(v>=0?'rgba(46,125,82,0.9)':'rgba(217,79,61,0.9)'):(v>=0?'rgba(46,125,82,0.4)':'rgba(217,79,61,0.4)')),
+         borderRadius:5,order:2},
       ]},
       options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw.toLocaleString()}M`}}},
@@ -528,14 +581,18 @@ function render(PL, BS, CF){
   }
 }
 
+function selectMonth(mi){ selectedMi=mi; render(_PL, _BS, _CF); }
+window.selectMonth = selectMonth;
+
 // ── 초기 로드 ─────────────────────────────────────────────
+let _PL=null, _BS=null, _CF=null;
 (async()=>{
   try{
     const result = await apiGet();
-    const PL = result.data    || null;
-    const BS = result.data_bs || [];
-    const CF = result.data_cf || null;
-    render(PL, BS.length>0?BS:null, CF);
+    _PL = result.data    || null;
+    _BS = (result.data_bs||[]).length>0 ? result.data_bs : null;
+    _CF = result.data_cf || null;
+    render(_PL, _BS, _CF);
   }catch(err){
     document.getElementById('loading').innerHTML=`
       <div class="empty">
