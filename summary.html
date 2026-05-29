@@ -141,6 +141,18 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .ch-bar-fill{height:100%;border-radius:2px;transition:width .4s ease}
 .ch-pct{font-size:10px;color:var(--muted);font-weight:600}
 .ch-delta{font-size:10px;font-weight:700;margin-top:3px}
+.alert-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:16px;box-shadow:var(--shadow)}
+.alert-item{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--bg2)}
+.alert-item:last-child{border-bottom:none;padding-bottom:0}
+.alert-icon{font-size:20px;flex-shrink:0;margin-top:1px}
+.alert-content{flex:1}
+.alert-title{font-size:13px;font-weight:700;margin-bottom:3px}
+.alert-body{font-size:12px;color:var(--muted);line-height:1.6}
+.alert-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle}
+.alert-badge.red{background:var(--red-light);color:var(--red)}
+.alert-badge.amber{background:var(--amber-light);color:var(--amber)}
+.alert-badge.green{background:var(--green-light);color:var(--green)}
+.alert-empty{text-align:center;padding:20px;color:var(--faint);font-size:13px}
 @media(max-width:768px){
   .kpi-grid{grid-template-columns:1fr 1fr}
   .turnover-grid{grid-template-columns:1fr}
@@ -223,6 +235,10 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
     <!-- 채널별 기여도 -->
     <div class="section-title">채널별 매출 기여도</div>
     <div class="ch-grid" id="ch-grid"></div>
+
+    <!-- 비용 집중도 경보 -->
+    <div class="section-title">비용 집중도 경보</div>
+    <div class="alert-box" id="alert-box"></div>
 
     <!-- 주목 포인트 -->
     <div class="section-title">이번 달 주목할 점</div>
@@ -633,6 +649,141 @@ function render(PL, BS, CF){
     }).join('');
   } else {
     chEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--faint);font-size:13px">손익 또는 현금흐름표 데이터를 업로드하면 채널별 기여도가 표시됩니다</div>';
+  }
+
+  // ── 비용 집중도 경보 ──────────────────────────────────
+  const alertEl = document.getElementById('alert-box');
+  const alerts = [];
+
+  // CF 데이터 기반 비용 항목별 전월 대비 급증 감지
+  if(CF && cfIdx > 0){
+    const prevIdx = cfIdx - 1;
+    const costItems = [
+      {name:'브랜드마케팅', key:'brand',      threshold:50},
+      {name:'인건비',       key:'labor1',     threshold:20},
+      {name:'지급수수료',   key:'fee',        threshold:50},
+      {name:'물류비',       key:'logistics',  threshold:30},
+      {name:'1차판관비',    key:'sga1',       threshold:30},
+      {name:'2차판관비',    key:'sga2',       threshold:20},
+    ];
+
+    costItems.forEach(item=>{
+      const cur  = Math.abs(CF[item.key][cfIdx]||0);
+      const prev = Math.abs(CF[item.key][prevIdx]||0);
+      if(prev<=0 || cur<=0) return;
+      const chgPct = (cur-prev)/prev*100;
+
+      if(Math.abs(chgPct) >= item.threshold){
+        const isUp = chgPct > 0;
+        const severity = Math.abs(chgPct) >= item.threshold*2 ? 'red' : 'amber';
+        alerts.push({
+          icon: isUp ? '⚠️' : '✅',
+          severity,
+          title: `${item.name} ${isUp?'급증':'급감'}`,
+          body: `전월 ${Math.round(prev).toLocaleString()}M → 이번달 ${Math.round(cur).toLocaleString()}M`,
+          badge: `${isUp?'+':''}${chgPct.toFixed(1)}%`,
+          isUp,
+        });
+      }
+    });
+
+    // 매출 대비 판관비 비율 경보
+    const rev = CF.revenue[cfIdx]||0;
+    const sga = Math.abs(CF.sga1[cfIdx]||0) + Math.abs(CF.sga2[cfIdx]||0);
+    if(rev>0){
+      const sgaRatio = sga/rev*100;
+      if(sgaRatio > 80){
+        alerts.push({
+          icon:'🚨', severity:'red',
+          title:'판관비율 위험 수준',
+          body:`매출 대비 판관비 비율이 ${sgaRatio.toFixed(1)}%입니다. 매출 ${Math.round(rev).toLocaleString()}M 대비 판관비 ${Math.round(sga).toLocaleString()}M`,
+          badge:`${sgaRatio.toFixed(1)}%`,
+          isUp:true,
+        });
+      } else if(sgaRatio > 60){
+        alerts.push({
+          icon:'⚠️', severity:'amber',
+          title:'판관비율 주의',
+          body:`매출 대비 판관비 비율이 ${sgaRatio.toFixed(1)}%입니다. 지속적인 모니터링이 필요합니다.`,
+          badge:`${sgaRatio.toFixed(1)}%`,
+          isUp:true,
+        });
+      }
+    }
+
+    // 영업CF 연속 적자 경보
+    const recentOpCFs = CF.opCF.slice(Math.max(0,cfIdx-2), cfIdx+1);
+    const allNeg = recentOpCFs.every(v=>v<0);
+    if(allNeg && recentOpCFs.length>=2){
+      alerts.push({
+        icon:'🔴', severity:'red',
+        title:`영업현금흐름 ${recentOpCFs.length}개월 연속 적자`,
+        body:`최근 ${recentOpCFs.length}개월 영업CF: ${recentOpCFs.map(v=>Math.round(v).toLocaleString()+'M').join(' → ')}`,
+        badge:`${recentOpCFs.length}개월 연속`,
+        isUp:true,
+      });
+    }
+
+    // 현금잔액 급감 경보
+    const curCash = CF.cashBal[cfIdx]||0;
+    const prevCash = CF.cashBal[prevIdx]||0;
+    if(prevCash>0){
+      const cashChg = (curCash-prevCash)/prevCash*100;
+      if(cashChg <= -15){
+        alerts.push({
+          icon:'💸', severity:'red',
+          title:'현금잔액 급감',
+          body:`전월 ${Math.round(prevCash).toLocaleString()}M → 이번달 ${Math.round(curCash).toLocaleString()}M (${cashChg.toFixed(1)}%)`,
+          badge:`${cashChg.toFixed(1)}%`,
+          isUp:false,
+        });
+      }
+    }
+  } else if(PL && plSmi>0){
+    // PL 기반 경보
+    const costItemsPL = [
+      {name:'브랜드마케팅', curK:'brand',    prevK:'brand'},
+      {name:'인건비',       curK:'labor',    prevK:'labor'},
+      {name:'지급수수료',   curK:'fee',      prevK:'fee'},
+    ];
+    costItemsPL.forEach(item=>{
+      const cur  = Math.abs(M(PL[item.curK][plSmi])||0);
+      const prev = Math.abs(M(PL[item.prevK][plSmi-1])||0);
+      if(prev<=0||cur<=0) return;
+      const chgPct = (cur-prev)/prev*100;
+      if(Math.abs(chgPct)>=50){
+        const severity = Math.abs(chgPct)>=100?'red':'amber';
+        alerts.push({
+          icon:chgPct>0?'⚠️':'✅', severity,
+          title:`${item.name} ${chgPct>0?'급증':'급감'}`,
+          body:`전월 ${Math.round(prev).toLocaleString()}M → 이번달 ${Math.round(cur).toLocaleString()}M`,
+          badge:`${chgPct>=0?'+':''}${chgPct.toFixed(1)}%`,
+          isUp:chgPct>0,
+        });
+      }
+    });
+  }
+
+  // 경보 없으면 정상 메시지
+  if(alerts.length===0){
+    alertEl.innerHTML='<div class="alert-empty">✅ 이번 달 특이 비용 이슈가 없습니다.</div>';
+  } else {
+    // 심각도 순 정렬 (red → amber → green)
+    alerts.sort((a,b)=>{
+      const order={red:0,amber:1,green:2};
+      return (order[a.severity]||1)-(order[b.severity]||1);
+    });
+    alertEl.innerHTML = alerts.map(a=>`
+      <div class="alert-item">
+        <div class="alert-icon">${a.icon}</div>
+        <div class="alert-content">
+          <div class="alert-title">
+            ${a.title}
+            <span class="alert-badge ${a.severity}">${a.badge}</span>
+          </div>
+          <div class="alert-body">${a.body}</div>
+        </div>
+      </div>`).join('');
   }
 
   // ── 주목 포인트 ───────────────────────────────────────
