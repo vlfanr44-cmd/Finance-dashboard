@@ -843,12 +843,27 @@ function render(PL, BS, CF){
     </div>`).join('');
 
   // ── 추이 차트 ─────────────────────────────────────────
-  if(PL){
-    const lmi = PL.lastMonthIdx;
-    const mLabels = Array.from({length:lmi+1},(_,i)=>(i+1)+'월');
-    const revData = PL.revenue.slice(0,lmi+1).map(v=>Math.round(M(v)));
-    const opData  = PL.opProfit.slice(0,lmi+1).map(v=>Math.round(M(v)));
-    const selMi   = plSmi!=null ? Math.min(plSmi,lmi) : lmi;
+  // 손익 추이: CF 데이터 우선, 없으면 PL 데이터 사용
+  if(CF || PL){
+    let mLabels, revData, opData, selChartMi;
+
+    if(CF){
+      // CF 기준: validMonths 전체 (2024.11 ~ 2026.04)
+      mLabels   = validMonths.map(vm=>{
+        const parts = vm.month.split('.');
+        return parts[1] ? parseInt(parts[1])+'월' : vm.month;
+      });
+      revData   = validMonths.map(vm => Math.round(CF.revenue[vm.idx]||0));
+      opData    = validMonths.map(vm => Math.round(CF.opProfit2[vm.idx]||0));
+      selChartMi = smi; // validMonths 기준 선택 인덱스
+    } else {
+      // PL 기준 (CF 없을 때 fallback)
+      const lmi = PL.lastMonthIdx;
+      mLabels   = Array.from({length:lmi+1},(_,i)=>(i+1)+'월');
+      revData   = PL.revenue.slice(0,lmi+1).map(v=>Math.round(M(v)));
+      opData    = PL.opProfit.slice(0,lmi+1).map(v=>Math.round(M(v)));
+      selChartMi = plSmi!=null ? Math.min(plSmi,lmi) : lmi;
+    }
 
     mkChart('c-pl',{
       type:'bar',
@@ -856,16 +871,29 @@ function render(PL, BS, CF){
         {type:'line',label:'매출액',data:revData,
          borderColor:'#2B4EBF',backgroundColor:'rgba(43,78,191,0.07)',
          borderWidth:3,
-         pointRadius:revData.map((_,i)=>i===selMi?7:4),
-         pointBackgroundColor:revData.map((_,i)=>i===selMi?'#F27B50':'#2B4EBF'),
+         pointRadius:revData.map((_,i)=>i===selChartMi?7:3),
+         pointBackgroundColor:revData.map((_,i)=>i===selChartMi?'#F27B50':'#2B4EBF'),
          pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,fill:true,order:1},
         {label:'영업이익',data:opData,
-         backgroundColor:opData.map((v,i)=>i===selMi?(v>=0?'rgba(46,125,82,0.9)':'rgba(217,79,61,0.9)'):(v>=0?'rgba(46,125,82,0.4)':'rgba(217,79,61,0.4)')),
-         borderRadius:5,order:2},
+         backgroundColor:opData.map((v,i)=>
+           i===selChartMi
+             ?(v>=0?'rgba(46,125,82,0.9)':'rgba(217,79,61,0.9)')
+             :(v>=0?'rgba(46,125,82,0.35)':'rgba(217,79,61,0.35)')),
+         borderRadius:4,order:2},
       ]},
       options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw.toLocaleString()}M`}}},
-        scales:{x:xAx,y:yAx(v=>v.toLocaleString()+'M')}}
+        plugins:{legend:{display:false},
+          tooltip:{mode:'index',intersect:false,callbacks:{
+            label:ctx=>`${ctx.dataset.label}: ${ctx.raw.toLocaleString()}M`,
+            title:ctx=>{
+              const vm=validMonths[ctx[0].dataIndex];
+              return vm?vm.year+'.'+vm.month.split('.')[1]:ctx[0].label;
+            }
+          }}},
+        scales:{
+          x:{...xAx,ticks:{...xAx.ticks,autoSkip:true,maxTicksLimit:12}},
+          y:yAx(v=>v.toLocaleString()+'M')
+        }}
     });
   }
 
