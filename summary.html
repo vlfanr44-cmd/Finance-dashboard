@@ -121,9 +121,31 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .mon-btn.on{background:var(--grad);color:#fff;border-color:transparent;font-weight:700;box-shadow:0 2px 8px rgba(43,78,191,.3)}
 .mon-sep{width:1px;height:20px;background:var(--border);margin:0 6px;flex-shrink:0;align-self:center}
 .year-lbl{font-size:10px;font-weight:800;color:var(--blue);background:var(--blue-light);padding:3px 8px;border-radius:5px;letter-spacing:.3px;white-space:nowrap;align-self:center}
+.yoy-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.yoy-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);transition:all .2s}
+.yoy-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.yoy-lbl{font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.yoy-row{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px}
+.yoy-val{font-size:18px;font-weight:800;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.yoy-prev{font-size:11px;color:var(--muted);font-weight:500}
+.yoy-delta{font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.yoy-delta.up{background:var(--green-light);color:var(--green)}
+.yoy-delta.dn{background:var(--red-light);color:var(--red)}
+.yoy-delta.nu{background:var(--card2);color:var(--muted)}
+.ch-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+.ch-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--shadow);transition:all .2s}
+.ch-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.ch-name{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;letter-spacing:.3px}
+.ch-val{font-size:16px;font-weight:800;letter-spacing:-.4px;font-variant-numeric:tabular-nums;margin-bottom:4px}
+.ch-bar-wrap{height:4px;background:var(--bg2);border-radius:2px;margin:8px 0}
+.ch-bar-fill{height:100%;border-radius:2px;transition:width .4s ease}
+.ch-pct{font-size:10px;color:var(--muted);font-weight:600}
+.ch-delta{font-size:10px;font-weight:700;margin-top:3px}
 @media(max-width:768px){
   .kpi-grid{grid-template-columns:1fr 1fr}
   .turnover-grid{grid-template-columns:1fr}
+  .yoy-grid{grid-template-columns:1fr 1fr}
+  .ch-grid{grid-template-columns:1fr 1fr}
   .g2{grid-template-columns:1fr}
   .insights{grid-template-columns:1fr}
   .nav-tabs{display:none}
@@ -193,6 +215,14 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
     <!-- 회전일수 -->
     <div class="section-title">운전자본 효율</div>
     <div class="turnover-grid" id="turnover-grid"></div>
+
+    <!-- 전년 동기 대비 (YoY) -->
+    <div class="section-title">전년 동기 대비 (YoY)</div>
+    <div class="yoy-grid" id="yoy-grid"></div>
+
+    <!-- 채널별 기여도 -->
+    <div class="section-title">채널별 매출 기여도</div>
+    <div class="ch-grid" id="ch-grid"></div>
 
     <!-- 주목 포인트 -->
     <div class="section-title">이번 달 주목할 점</div>
@@ -487,6 +517,111 @@ function render(PL, BS, CF){
       </div>`).join('');
   } else {
     toEl.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--faint);font-size:13px">손익 + 재무상태표 데이터를 모두 업로드하면 회전일수가 계산됩니다</div>';
+  }
+
+  // ── 전년 동기 대비 (YoY) ─────────────────────────────
+  // CF 데이터에서 전년 동월 찾기
+  // 현재 선택월 cfIdx 기준, 1년 전 = cfIdx - 12
+  const yoyEl = document.getElementById('yoy-grid');
+  if(CF && cfIdx >= 12){
+    const yoyIdx = cfIdx - 12; // 전년 동월 인덱스
+
+    const yoyItems = [
+      {lbl:'매출액',      cur:CF.revenue[cfIdx],    prev:CF.revenue[yoyIdx]},
+      {lbl:'영업이익',    cur:CF.opProfit2[cfIdx],  prev:CF.opProfit2[yoyIdx]},
+      {lbl:'영업CF',      cur:CF.opCF[cfIdx],       prev:CF.opCF[yoyIdx]},
+      {lbl:'현금잔액',    cur:CF.cashBal[cfIdx],    prev:CF.cashBal[yoyIdx]},
+    ];
+
+    yoyEl.innerHTML = yoyItems.map(item=>{
+      const d = item.prev ? (item.cur - item.prev)/Math.abs(item.prev)*100 : null;
+      const cls = d==null?'nu':d>=0?'up':'dn';
+      const dTxt = d==null?'-':(d>=0?'▲ +':'▼ ')+Math.abs(d).toFixed(1)+'%';
+
+      // 전년 동월 라벨
+      const prevVM = validMonths[smi-12] || null;
+      const prevLabel = prevVM ? (()=>{
+        const parts = prevVM.month.split('.');
+        return prevVM.year+'.'+(parts[1]||'');
+      })() : '전년동월';
+
+      return `<div class="yoy-card">
+        <div class="yoy-lbl">${item.lbl}</div>
+        <div class="yoy-row">
+          <div>
+            <div class="yoy-val">${Math.round(item.cur).toLocaleString()}M</div>
+            <div class="yoy-prev">전년 ${Math.round(item.prev).toLocaleString()}M</div>
+          </div>
+          <div class="yoy-delta ${cls}">${dTxt}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } else if(CF && cfIdx < 12){
+    yoyEl.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--faint);font-size:13px">
+      전년 동기 비교는 13개월 이상 데이터가 있을 때 표시됩니다.<br>
+      <small style="color:var(--faint)">(현재 ${validMonths.length}개월 데이터 보유)</small>
+    </div>`;
+  } else {
+    yoyEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--faint);font-size:13px">현금흐름표 데이터를 업로드하면 전년 동기 비교가 표시됩니다</div>';
+  }
+
+  // ── 채널별 기여도 ─────────────────────────────────────
+  const chEl = document.getElementById('ch-grid');
+  const CH_COLORS_S = ['#2B4EBF','#2E7D52','#F27B50','#7B5EA7','#A89880'];
+  const CH_NAMES_S  = ['자사몰(D2C)','B2B','B2C','Store','Export'];
+  const CH_KEYS_CF  = ['ch_d2c','ch_b2b','ch_b2c','ch_store'];
+
+  if(CF){
+    // CF 채널 데이터 사용
+    const chVals = CH_KEYS_CF.map(k=>(CF[k]&&CF[k][cfIdx])||0);
+    // Export는 별도 계산 (총매출 - 채널합)
+    const chSum = chVals.reduce((a,b)=>a+b,0);
+    const totalRev = CF.revenue[cfIdx]||0;
+    const exportVal = Math.max(0, totalRev - chSum);
+    const allVals = [...chVals, exportVal];
+    const total = allVals.reduce((a,b)=>a+b,0);
+
+    // 전년 동월 채널 비교
+    const prevChVals = cfIdx>=12 ? CH_KEYS_CF.map(k=>(CF[k]&&CF[k][cfIdx-12])||0) : null;
+    const prevTotal = cfIdx>=12 ? (CF.revenue[cfIdx-12]||0) : null;
+
+    chEl.innerHTML = allVals.map((v,i)=>{
+      const pct_val = total>0?(v/total*100):0;
+      const prevV = prevChVals ? (i<4?prevChVals[i]:Math.max(0,(prevTotal||0)-prevChVals.reduce((a,b)=>a+b,0))) : null;
+      const yoyD = prevV!=null&&prevV>0 ? (v-prevV)/prevV*100 : null;
+      const cls = yoyD==null?'nu':yoyD>=0?'up':'dn';
+
+      return `<div class="ch-card">
+        <div class="ch-name" style="color:${CH_COLORS_S[i]}">${CH_NAMES_S[i]}</div>
+        <div class="ch-val">${Math.round(v).toLocaleString()}M</div>
+        <div class="ch-bar-wrap">
+          <div class="ch-bar-fill" style="width:${pct_val.toFixed(1)}%;background:${CH_COLORS_S[i]}44;border:1px solid ${CH_COLORS_S[i]}88"></div>
+        </div>
+        <div class="ch-pct">비중 ${pct_val.toFixed(1)}%</div>
+        ${yoyD!=null?`<div class="ch-delta ${cls}">YoY ${yoyD>=0?'▲ +':'▼ '}${Math.abs(yoyD).toFixed(1)}%</div>`:''}
+      </div>`;
+    }).join('');
+  } else if(PL){
+    // PL 채널 데이터 사용
+    const chVals = [
+      M(PL.ch_d2c[plSmi]), M(PL.ch_b2b[plSmi]),
+      M(PL.ch_b2c[plSmi]), M(PL.ch_store[plSmi]), M(PL.ch_exp[plSmi])
+    ];
+    const total = chVals.reduce((a,b)=>a+b,0);
+
+    chEl.innerHTML = chVals.map((v,i)=>{
+      const pct_val = total>0?(v/total*100):0;
+      return `<div class="ch-card">
+        <div class="ch-name" style="color:${CH_COLORS_S[i]}">${CH_NAMES_S[i]}</div>
+        <div class="ch-val">${Math.round(v).toLocaleString()}M</div>
+        <div class="ch-bar-wrap">
+          <div class="ch-bar-fill" style="width:${pct_val.toFixed(1)}%;background:${CH_COLORS_S[i]}44;border:1px solid ${CH_COLORS_S[i]}88"></div>
+        </div>
+        <div class="ch-pct">비중 ${pct_val.toFixed(1)}%</div>
+      </div>`;
+    }).join('');
+  } else {
+    chEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--faint);font-size:13px">손익 또는 현금흐름표 데이터를 업로드하면 채널별 기여도가 표시됩니다</div>';
   }
 
   // ── 주목 포인트 ───────────────────────────────────────
