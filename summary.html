@@ -366,8 +366,19 @@ function render(PL, BS, CF){
   const plOPP  = PL&&plSmi>0 ? M(PL.opProfit[plSmi-1]) : null;
 
   // 재무상태표 최근
-  const bsL = BS && BS.length>0 ? BS[BS.length-1].data : null;
-  const bsP = BS && BS.length>1 ? BS[BS.length-2].data : null;
+  // 선택된 월에 맞는 BS 데이터 찾기 (예: selVM.year='2026', month='26.04' → '2026.04')
+  const bsMatchPeriod = selVM ? (()=>{
+    const parts = selVM.month.split('.');
+    const mo = parts[1] ? parts[1].padStart(2,'0') : null;
+    return mo ? selVM.year+'.'+mo : null;
+  })() : null;
+
+  const bsEntry = BS && BS.length>0
+    ? (bsMatchPeriod ? (BS.find(d=>d.period===bsMatchPeriod)||BS[BS.length-1]) : BS[BS.length-1])
+    : null;
+  const bsL = bsEntry ? bsEntry.data : null;
+  const bsLIdx = BS && bsMatchPeriod ? BS.findIndex(d=>d.period===bsMatchPeriod) : (BS?BS.length-1:-1);
+  const bsP = BS && bsLIdx>0 ? BS[bsLIdx-1].data : (BS&&BS.length>1?BS[BS.length-2].data:null);
   const debtRatio    = bsL ? bsL.ratio_debtRatio    : null;
   const currentRatio = bsL ? bsL.ratio_currentRatio : null;
 
