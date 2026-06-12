@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>법인카드 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F7F4EF;--bg2:#F0EBE1;--white:#FFFFFF;--card:#FFFDF9;--card2:#F5F0E8;
+  --border:#E8E0D0;--border2:#D9CFC0;
+  --text:#1A1A2E;--muted:#7A7080;--faint:#C4BBAC;
+  --blue:#2B4EBF;--blue-light:#EEF2FF;
+  --purple:#7B5EA7;--coral:#F27B50;--coral-light:#FEF0EB;
+  --green:#2E7D52;--green-light:#EDFAF3;
+  --red:#D94F3D;--red-light:#FEF0EE;
+  --amber:#D97B2E;--amber-light:#FEF5EB;
+  --grad:linear-gradient(135deg,#2B4EBF 0%,#7B5EA7 100%);
+  --shadow:0 2px 8px rgba(43,78,191,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 16px rgba(43,78,191,.10);
+  --shadow-lg:0 8px 32px rgba(43,78,191,.14);
+}
+body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:13px;-webkit-font-smoothing:antialiased}
+.topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow)}
+.logo{font-size:16px;font-weight:800;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.nav-tabs{display:flex;gap:2px;align-items:center}
+.nav-tab{font-size:12px;font-weight:600;padding:7px 16px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .2s}
+.nav-tab:hover{background:var(--card2);color:var(--text)}
+.nav-tab.active{background:var(--grad);color:#fff;box-shadow:0 2px 8px rgba(43,78,191,.25)}
+.topbar-r{display:flex;align-items:center;gap:10px}
+.badge{font-size:11px;color:var(--muted);background:var(--card2);padding:4px 12px;border-radius:20px;border:1px solid var(--border);font-weight:500}
+.upbtn{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:8px 18px;border-radius:10px;border:none;background:var(--grad);cursor:pointer;color:#fff;transition:all .2s;box-shadow:0 2px 8px rgba(43,78,191,.25)}
+.upbtn:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.upbtn.busy{opacity:.5;pointer-events:none;transform:none}
+.wrap{max-width:1200px;margin:0 auto;padding:24px 24px 60px}
+.dropzone{border:2px dashed var(--border2);border-radius:20px;padding:60px 20px;text-align:center;cursor:pointer;background:var(--card);transition:all .2s;box-shadow:var(--shadow)}
+.dropzone:hover,.dropzone.over{border-color:var(--blue);background:var(--blue-light)}
+.dz-icon{font-size:44px;margin-bottom:16px}
+.dz-title{font-size:16px;font-weight:700;margin-bottom:10px}
+.dz-sub{font-size:12px;color:var(--muted);line-height:2}
+/* 월 선택 */
+.mon-bar{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:16px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow)}
+.mon-lbl{font-size:11px;color:var(--muted);font-weight:700;margin-right:6px;white-space:nowrap;letter-spacing:.4px}
+.mon-btn{font-size:11px;font-weight:600;padding:5px 13px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;transition:all .2s}
+.mon-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+.mon-btn.on{background:var(--grad);color:#fff;border-color:transparent;font-weight:700;box-shadow:0 2px 8px rgba(43,78,191,.3)}
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);transition:all .2s;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--grad)}
+.kpi:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.kpi-lbl{font-size:10px;font-weight:700;letter-spacing:.6px;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.kpi-val{font-size:22px;font-weight:800;letter-spacing:-.6px;font-variant-numeric:tabular-nums}
+.kpi-delta{font-size:11px;font-weight:600;margin-top:6px}
+.up{color:var(--red)}.dn{color:var(--green)}.nu{color:var(--faint)}
+/* 탭 */
+.tabs{display:flex;gap:3px;margin-bottom:16px;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:4px;width:fit-content}
+.tab{font-size:12px;font-weight:600;padding:7px 18px;border-radius:9px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all .2s}
+.tab.on{background:var(--grad);color:#fff;box-shadow:0 2px 10px rgba(43,78,191,.3)}
+/* 패널 */
+.panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:14px;box-shadow:var(--shadow)}
+.ptitle{font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--muted);margin-bottom:16px;text-transform:uppercase}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--muted);margin-bottom:12px;font-weight:600}
+.ldot{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:middle}
+/* 테이블 */
+.twrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+th{background:var(--card2);font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--border);text-align:right;cursor:pointer;user-select:none}
+th:first-child{text-align:left}
+th:hover{background:var(--bg2)}
+td{padding:8px 12px;border-bottom:1px solid var(--bg2);text-align:right;font-variant-numeric:tabular-nums}
+td:first-child{text-align:left}
+tr:hover td{background:var(--blue-light)}
+tr:last-child td{border-bottom:none}
+tr.total-row td{font-weight:700;background:var(--card2)}
+/* 랭킹 바 */
+.rank-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bg2)}
+.rank-item:last-child{border-bottom:none}
+.rank-num{font-size:11px;font-weight:800;color:var(--muted);width:18px;flex-shrink:0;text-align:center}
+.rank-name{font-size:12px;font-weight:600;flex:1;min-width:80px}
+.rank-bar-wrap{flex:2;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden}
+.rank-bar{height:100%;border-radius:3px;transition:width .4s ease}
+.rank-val{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;min-width:80px;text-align:right}
+.rank-delta{font-size:10px;font-weight:600;min-width:55px;text-align:right}
+/* 카테고리 뱃지 */
+.cat-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap}
+/* 잠금 */
+.lock-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center}
+.lock-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:40px 36px;width:360px;text-align:center;box-shadow:var(--shadow-lg)}
+.lock-logo{font-size:18px;font-weight:800;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px}
+.lock-sub{font-size:12px;color:var(--muted);margin-bottom:28px}
+.lock-input{width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;background:var(--card);color:var(--text);outline:none;letter-spacing:.1em;margin-bottom:12px;transition:border .2s}
+.lock-input:focus{border-color:var(--blue)}
+.lock-btn{width:100%;padding:11px;border:none;border-radius:10px;background:var(--grad);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
+.lock-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg)}
+.lock-err{font-size:12px;color:var(--red);margin-top:8px;min-height:16px}
+.empty{text-align:center;padding:48px;color:var(--faint);font-size:13px}
+.toast{position:fixed;top:68px;right:18px;z-index:999;font-size:12px;font-weight:700;padding:10px 18px;border-radius:12px;opacity:0;transition:opacity .25s;pointer-events:none;box-shadow:var(--shadow-md)}
+.toast.show{opacity:1}
+.toast.ok{background:var(--green-light);color:#1a5c3a;border:1px solid #A8ECC8}
+.toast.err{background:var(--red-light);color:#a12d20;border:1px solid #F5C6C2}
+.toast.info{background:var(--white);color:var(--text);border:1px solid var(--border)}
+@media(max-width:768px){.kpi-grid{grid-template-columns:1fr 1fr}.g2,.g3{grid-template-columns:1fr}.nav-tabs{display:none}}
+</style>
+</head>
+<body>
+
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-logo">Medisola Finance</div>
+    <div class="lock-sub">접근하려면 비밀번호를 입력하세요</div>
+    <input class="lock-input" type="password" id="pwInput" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')checkPw()">
+    <button class="lock-btn" onclick="checkPw()">확인</button>
+    <div class="lock-err" id="pwErr"></div>
+  </div>
+</div>
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:20px">
+    <div class="logo">Medisola Finance</div>
+    <nav class="nav-tabs">
+      <a class="nav-tab" href="summary.html">📋 경영 요약</a>
+      <a class="nav-tab" href="index.html">📊 손익</a>
+      <a class="nav-tab" href="balance.html">🏦 재무상태표</a>
+      <a class="nav-tab" href="cashflow.html">💧 현금흐름표</a>
+      <a class="nav-tab active" href="card.html">💳 법인카드</a>
+    </nav>
+  </div>
+  <div class="topbar-r">
+    <span class="badge" id="pbadge">데이터 없음</span>
+    <label class="upbtn" id="upbtn">
+      <input type="file" id="finput" accept=".xlsx,.xls" style="display:none">
+      ↑ 법인카드 업로드
+    </label>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="wrap">
+  <div id="loading" class="empty" style="padding:60px">데이터를 불러오는 중...</div>
+
+  <div id="dropzone" class="dropzone" style="display:none">
+    <div class="dz-icon">💳</div>
+    <div class="dz-title">법인카드 엑셀 파일을 업로드하세요</div>
+    <div class="dz-sub">
+      <b>법인카드_2026년5월분.xlsx</b> 형태 그대로 올리면 됩니다<br>
+      <b>부서매핑</b> 시트가 포함된 파일을 업로드해 주세요<br>
+      매월 업로드하면 자동으로 누적됩니다
+    </div>
+  </div>
+
+  <div id="main" style="display:none">
+    <div class="mon-bar" id="mon-bar"><span class="mon-lbl">월 선택:</span></div>
+    <div class="kpi-grid" id="kpis"></div>
+    <div class="tabs">
+      <button class="tab on" data-t="overview">실별 현황</button>
+      <button class="tab" data-t="dept">부서별</button>
+      <button class="tab" data-t="person">개인별</button>
+      <button class="tab" data-t="cat">카테고리</button>
+      <button class="tab" data-t="trend">월별 추이</button>
+      <button class="tab" data-t="detail">상세 내역</button>
+    </div>
+
+    <!-- 실별 현황 -->
+    <div id="pane-overview">
+      <div class="g2">
+        <div class="panel">
+          <div class="ptitle">실별 사용금액</div>
+          <div style="position:relative;height:260px"><canvas id="c-sil-bar" role="img" aria-label="실별 사용금액">실별 차트</canvas></div>
+        </div>
+        <div class="panel">
+          <div class="ptitle">실별 비중</div>
+          <div style="position:relative;height:220px"><canvas id="c-sil-pie" role="img" aria-label="실별 비중">실별 파이</canvas></div>
+          <div id="sil-pie-leg" class="legend" style="margin-top:10px;margin-bottom:0;flex-direction:column;gap:4px"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">전월 대비 실별 증감</div>
+        <div id="sil-delta"></div>
+      </div>
+    </div>
+
+    <!-- 부서별 -->
+    <div id="pane-dept" style="display:none">
+      <div class="panel">
+        <div class="ptitle">부서별 사용금액 랭킹</div>
+        <div id="dept-rank"></div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">부서별 월별 추이</div>
+        <div class="legend" id="dept-trend-leg"></div>
+        <div style="position:relative;height:260px"><canvas id="c-dept-trend" role="img" aria-label="부서별 추이">부서 추이</canvas></div>
+      </div>
+    </div>
+
+    <!-- 개인별 -->
+    <div id="pane-person" style="display:none">
+      <div class="panel">
+        <div class="ptitle">개인별 사용금액 랭킹</div>
+        <div id="person-rank"></div>
+      </div>
+    </div>
+
+    <!-- 카테고리 -->
+    <div id="pane-cat" style="display:none">
+      <div class="g2">
+        <div class="panel">
+          <div class="ptitle">카테고리별 비중</div>
+          <div style="position:relative;height:220px"><canvas id="c-cat-pie" role="img" aria-label="카테고리 비중">카테고리 파이</canvas></div>
+          <div id="cat-pie-leg" class="legend" style="margin-top:10px;margin-bottom:0;flex-direction:column;gap:4px"></div>
+        </div>
+        <div class="panel">
+          <div class="ptitle">카테고리별 금액</div>
+          <div style="position:relative;height:260px"><canvas id="c-cat-bar" role="img" aria-label="카테고리 금액">카테고리 바</canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 월별 추이 -->
+    <div id="pane-trend" style="display:none">
+      <div class="panel">
+        <div class="ptitle">월별 총 사용금액 추이</div>
+        <div class="legend">
+          <span><span class="ldot" style="background:#2B4EBF"></span>총사용액</span>
+          <span><span class="ldot" style="background:#F27B50"></span>건수(우축)</span>
+        </div>
+        <div style="position:relative;height:260px"><canvas id="c-trend" role="img" aria-label="월별 추이">추이 차트</canvas></div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">실별 월별 추이</div>
+        <div class="legend" id="sil-trend-leg"></div>
+        <div style="position:relative;height:260px"><canvas id="c-sil-trend" role="img" aria-label="실별 추이">실별 추이</canvas></div>
+      </div>
+    </div>
+
+    <!-- 상세 내역 -->
+    <div id="pane-detail" style="display:none">
+      <div class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div class="ptitle" style="margin-bottom:0">상세 내역</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="search-input" type="text" placeholder="가맹점명·이름 검색..."
+              style="font-size:12px;padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);outline:none;width:200px;font-family:inherit">
+            <select id="cat-filter" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);outline:none;font-family:inherit;color:var(--text)">
+              <option value="">전체 카테고리</option>
+            </select>
+          </div>
+        </div>
+        <div class="twrap"><table id="detail-tbl"></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbxft4SwgXRNwuSSD04Oeb8cn8WRoZo_eFq-8CnvoHbK01QZ-LbstqUYX0K3oc2BoPg/exec';
+
+// ── 카테고리 분류 규칙 ────────────────────────────────────
+const CAT_RULES = [
+  {cat:'식비·음료',     color:'#F27B50', keywords:['식당','삼계탕','갈비','순대','칼국수','김밥','커피','카페','스타벅스','투썸','이디야','매머드','빽다방','할리스','점심','저녁','식사','한식','중식','일식','양식','치킨','피자','버거','맥도날드','롯데리아','서브웨이','도시락','김치','설렁탕','추어탕','냉면','국밥','쌈밥','초밥','라멘','파스타']},
+  {cat:'교통·이동',     color:'#2B4EBF', keywords:['티머니','택시','버스','지하철','주차','주유','KTX','SRT','코레일','항공','에어','카카오택시','우버','쏘카','그린카','렌터카','모빌리티','하이패스']},
+  {cat:'구독·SaaS',     color:'#7B5EA7', keywords:['GITHUB','OPENAI','CHATGPT','NOTION','SLACK','ZOOM','ADOBE','MICROSOFT','GOOGLE','AWS','VERCEL','SUPABASE','OUTLINE','WORDPRESS','FIGMA','ATLASSIAN','DROPBOX','STRIPE','TWILIO','SENDGRID','MAILCHIMP','HUBSPOT']},
+  {cat:'광고·마케팅',   color:'#D97B2E', keywords:['네이버광고','카카오광고','구글광고','META','FACEBOOK','INSTAGRAM','유튜브광고','광고','마케팅','홍보','컬리광고','쿠팡광고']},
+  {cat:'쇼핑·소모품',   color:'#2E7D52', keywords:['쿠팡','네이버','11번가','G마켓','옥션','위메프','티몬','인터파크','SSG','롯데ON','이마트','홈플러스','코스트코','다이소','사무용품','문구','소모품','비품']},
+  {cat:'숙박·여행',     color:'#5C7AEA', keywords:['호텔','모텔','펜션','에어비앤비','야놀자','여기어때','숙박','여행','리조트','콘도']},
+  {cat:'의료·건강',     color:'#E05580', keywords:['병원','의원','약국','치과','한의원','피부과','건강','의료','헬스','피트니스','스포츠']},
+  {cat:'교육·도서',     color:'#888780', keywords:['교육','강의','세미나','도서','책','YES24','알라딘','교보','서점','온라인강의','학원','인강']},
+];
+const CAT_COLORS = CAT_RULES.map(r=>r.color);
+const CAT_NAMES  = CAT_RULES.map(r=>r.cat).concat(['기타']);
+
+function classifyMerchant(name){
+  if(!name) return '기타';
+  const upper = name.toUpperCase();
+  for(const rule of CAT_RULES){
+    for(const kw of rule.keywords){
+      if(upper.includes(kw.toUpperCase())) return rule.cat;
+    }
+  }
+  return '기타';
+}
+
+// ── 실 색상 ──────────────────────────────────────────────
+const SIL_COLORS = ['#2B4EBF','#F27B50','#7B5EA7','#2E7D52','#D97B2E','#D94F3D','#5C7AEA','#888780'];
+let silColorMap = {};
+
+// ── 유틸 ─────────────────────────────────────────────────
+const fmtW  = v => Math.round(v||0).toLocaleString()+'원';
+const fmtWS = v => Math.round(v||0).toLocaleString();
+const fmtP  = v => v==null||!isFinite(v)?'-':((v>=0?'+':'')+v.toFixed(1)+'%');
+const pct   = (a,b) => b?(a-b)/Math.abs(b)*100:null;
+const dc    = v => v>0?'up':v<0?'dn':'nu'; // 카드비는 증가=나쁨
+
+let charts = {}, curTab = 'overview';
+let allMonths = {}; // {YYYYMM: [{name,sil,dept,merchant,amount,date,category,content}]}
+let selMonth = null;
+
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show '+type;
+  clearTimeout(t._t); t._t=setTimeout(()=>t.className='toast',3500);
+}
+
+// ── 잠금 ─────────────────────────────────────────────────
+(function(){
+  const PW='medi001!!', SK='medi_auth';
+  if(sessionStorage.getItem(SK)==='ok') document.getElementById('lockScreen').style.display='none';
+  window.checkPw=function(){
+    const v=document.getElementById('pwInput').value;
+    if(v===PW){ sessionStorage.setItem(SK,'ok'); document.getElementById('lockScreen').style.display='none'; }
+    else{ document.getElementById('pwErr').textContent='비밀번호가 올바르지 않습니다.'; document.getElementById('pwInput').value=''; document.getElementById('pwInput').focus(); }
+  };
+})();
+
+// ── API ──────────────────────────────────────────────────
+async function apiGet(){
+  const r=await fetch(API+'?action=get'); const j=await r.json();
+  if(!j.ok) throw new Error(j.error); return j;
+}
+async function apiSave(key,value){
+  const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key,value})});
+  const j=await r.json(); if(!j.ok) throw new Error(j.error);
+}
+
+// ── 엑셀 파싱 ────────────────────────────────────────────
+function parseCardFile(wb){
+  // 1. 부서매핑 시트 파싱
+  const mapping = {}; // {cardNo4: {name, dept, sil}}
+  const mapWs = wb.Sheets['부서매핑'];
+  if(mapWs){
+    const mapRows = XLSX.utils.sheet_to_json(mapWs, {header:1});
+    mapRows.slice(1).forEach(row=>{
+      if(!row[0]) return;
+      const cardNo = String(row[0]).trim().padStart(4,'0');
+      mapping[cardNo] = {name: String(row[1]||'').trim(), dept: String(row[2]||'').trim(), sil: String(row[3]||'').trim()};
+    });
+  }
+
+  // 2. 카드 시트 파싱
+  const records = [];
+  const skipSheets = new Set(['부서매핑','종합']);
+
+  Object.keys(wb.Sheets).forEach(sn=>{
+    if(skipSheets.has(sn)) return;
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1});
+    if(rows.length < 2) return;
+
+    // 카드번호 4자리 추출 (시트명 앞 4자리)
+    const cardNo = sn.replace(/[^0-9]/g,'').slice(0,4).padStart(4,'0');
+    const isPublic = sn.includes('공용');
+    const mapInfo = mapping[cardNo] || {name: sn, dept:'미분류', sil:'미분류'};
+
+    rows.slice(1).forEach(row=>{
+      // 유효 행 체크: 사용일자(col2)와 이용금액(col6) 필수
+      const dateVal  = row[2];
+      const amtVal   = row[6];
+      if(!dateVal || amtVal==null || typeof amtVal !== 'number') return;
+      if(amtVal <= 0) return; // 취소/반품 제외
+
+      // 날짜 파싱
+      let dateStr = String(dateVal).replace(/\./g,'-').slice(0,10);
+      const dateParts = dateStr.split('-');
+      if(dateParts.length < 3) return;
+      const yyyymm = dateParts[0] + dateParts[1].padStart(2,'0');
+
+      // 공용카드: 11번째 열에 부서 정보
+      let dept = mapInfo.dept;
+      let sil  = mapInfo.sil;
+      if(isPublic && row[10]){
+        // 공용카드는 매핑에서 실은 가져오고, 부서는 행의 부서 컬럼 사용
+        dept = String(row[10]).trim() || dept;
+      }
+
+      const merchant = String(row[5]||'').trim();
+      const content  = String(row[9]||row[10]||'').trim();
+      const category = classifyMerchant(merchant + ' ' + content);
+
+      records.push({
+        yyyymm,
+        date: dateStr,
+        name: mapInfo.name,
+        dept,
+        sil,
+        cardNo,
+        merchant,
+        amount: amtVal,
+        category,
+        content,
+      });
+    });
+  });
+
+  // 월별로 그룹핑
+  const grouped = {};
+  records.forEach(r=>{
+    if(!grouped[r.yyyymm]) grouped[r.yyyymm] = [];
+    grouped[r.yyyymm].push(r);
+  });
+
+  return grouped;
+}
+
+async function handleFile(file){
+  const btn = document.getElementById('upbtn');
+  btn.classList.add('busy');
+  toast('파일 분석 중...','info');
+  try{
+    const data = await new Promise((res,rej)=>{
+      const rd = new FileReader();
+      rd.onload = e=>{
+        try{
+          const wb = XLSX.read(e.target.result, {type:'binary'});
+          res(parseCardFile(wb));
+        }catch(err){rej(err);}
+      };
+      rd.onerror = rej;
+      rd.readAsBinaryString(file);
+    });
+
+    // 기존 데이터와 병합
+    const result = await apiGet();
+    const stored = result.data_card || {};
+    Object.keys(data).forEach(ym=>{ stored[ym] = data[ym]; });
+    await apiSave('__data_card__', stored);
+    allMonths = stored;
+    selMonth = null;
+    render();
+    const months = Object.keys(data).sort();
+    toast(`${months.join(', ')} 업로드 완료 ✓ (${Object.values(data).flat().length}건)`);
+  }catch(err){
+    toast('오류: '+err.message,'err');
+    console.error(err);
+  }
+  btn.classList.remove('busy');
+  document.getElementById('finput').value='';
+}
+
+// ── 차트 ─────────────────────────────────────────────────
+function mkChart(id,cfg){
+  if(charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), cfg);
+}
+const xAx = {ticks:{font:{size:11,family:'Pretendard'},color:'#A89880',autoSkip:true,maxRotation:45},grid:{display:false},border:{display:false}};
+const yAx = cb=>({ticks:{font:{size:11,family:'Pretendard'},color:'#A89880',callback:cb},grid:{color:'rgba(0,0,0,0.04)'},border:{display:false}});
+
+// ── 메인 렌더 ─────────────────────────────────────────────
+function render(){
+  const months = Object.keys(allMonths).sort();
+  const has = months.length > 0;
+  document.getElementById('dropzone').style.display = has?'none':'block';
+  document.getElementById('main').style.display = has?'block':'none';
+  if(!has) return;
+
+  if(!selMonth || !allMonths[selMonth]) selMonth = months[months.length-1];
+
+  // 실 색상 매핑
+  const allSils = [...new Set(Object.values(allMonths).flat().map(r=>r.sil).filter(Boolean))].sort();
+  allSils.forEach((s,i)=>{ silColorMap[s] = SIL_COLORS[i % SIL_COLORS.length]; });
+
+  // 월 선택 바
+  document.getElementById('mon-bar').innerHTML =
+    '<span class="mon-lbl">월 선택:</span>' +
+    months.map(m=>`<button class="mon-btn${m===selMonth?' on':''}" onclick="selectMonth('${m}')">${m.slice(0,4)}년 ${parseInt(m.slice(4))}월</button>`).join('');
+
+  const curRecs = allMonths[selMonth] || [];
+  const prevMonth = months[months.indexOf(selMonth)-1];
+  const prevRecs  = prevMonth ? (allMonths[prevMonth]||[]) : [];
+
+  document.getElementById('pbadge').textContent =
+    `${selMonth.slice(0,4)}년 ${parseInt(selMonth.slice(4))}월 · ${curRecs.length}건`;
+
+  // ── KPI ──────────────────────────────────────────────
+  const total    = curRecs.reduce((s,r)=>s+r.amount,0);
+  const prevTotal= prevRecs.reduce((s,r)=>s+r.amount,0);
+  const totalDelta = pct(total, prevTotal);
+  const persons  = new Set(curRecs.map(r=>r.name)).size;
+  const avgPer   = persons>0 ? total/persons : 0;
+
+  document.getElementById('kpis').innerHTML=[
+    {l:'총 사용금액', v:fmtW(total),     d:totalDelta, inv:true},
+    {l:'전월 대비',   v:totalDelta!=null?fmtP(totalDelta):'-', d:null, special:totalDelta},
+    {l:'사용 인원',   v:persons+'명',    d:null},
+    {l:'1인 평균',    v:fmtW(avgPer),    d:null},
+  ].map(k=>`
+    <div class="kpi">
+      <div class="kpi-lbl">${k.l}</div>
+      <div class="kpi-val" style="${k.special!=null?(k.special>0?'color:var(--red)':'color:var(--green)'):''}">
+        ${k.v}
+      </div>
+      ${k.d!=null?`<div class="kpi-delta ${k.inv?dc(-k.d):dc(k.d)}">${k.d>0?'▲':'▼'} ${fmtP(k.d)} 전월比</div>`:''}
+    </div>`).join('');
+
+  // ── 실별 현황 ─────────────────────────────────────────
+  const silMap  = groupBy(curRecs, 'sil');
+  const silNames= Object.keys(silMap).sort();
+  const silVals = silNames.map(s=>silMap[s].reduce((a,r)=>a+r.amount,0));
+  const silTotal= silVals.reduce((a,b)=>a+b,0);
+
+  mkChart('c-sil-bar',{
+    type:'bar',
+    data:{labels:silNames,datasets:[{data:silVals,backgroundColor:silNames.map(s=>silColorMap[s]||'#888'),borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${fmtW(ctx.raw)}`}}},
+      scales:{x:{...xAx,ticks:{...xAx.ticks,maxRotation:20}},y:yAx(v=>v.toLocaleString()+'원')}}
+  });
+
+  mkChart('c-sil-pie',{
+    type:'doughnut',
+    data:{labels:silNames,datasets:[{data:silVals,backgroundColor:silNames.map(s=>silColorMap[s]||'#888'),borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>silTotal?`${ctx.label}: ${(ctx.raw/silTotal*100).toFixed(1)}%`:'-'}}}}
+  });
+  document.getElementById('sil-pie-leg').innerHTML = silNames.map((s,i)=>`
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)">
+      <span><span class="ldot" style="background:${silColorMap[s]||'#888'}"></span>${s}</span>
+      <span>${fmtWS(silVals[i])}원 · ${silTotal?(silVals[i]/silTotal*100).toFixed(1):0}%</span>
+    </div>`).join('');
+
+  // 전월 대비 실별 증감
+  const prevSilMap = groupBy(prevRecs,'sil');
+  if(prevMonth){
+    document.getElementById('sil-delta').innerHTML=`
+      <div class="twrap"><table>
+        <thead><tr><th>실</th><th>전월</th><th>이번달</th><th>증감</th><th>증감률</th><th>건수</th></tr></thead>
+        <tbody>${silNames.map((s,i)=>{
+          const pv = (prevSilMap[s]||[]).reduce((a,r)=>a+r.amount,0);
+          const cv = silVals[i];
+          const d  = cv-pv; const pp=pct(cv,pv);
+          const cls= d>0?'up':'dn'; // 카드비 증가=나쁨
+          return `<tr>
+            <td><span class="ldot" style="background:${silColorMap[s]||'#888'}"></span>${s}</td>
+            <td>${pv?fmtWS(pv)+'원':'-'}</td>
+            <td>${fmtWS(cv)}원</td>
+            <td class="${cls}">${d>=0?'+':''}${fmtWS(d)}원</td>
+            <td class="${cls}" style="font-weight:700">${pv?fmtP(pp):'-'}</td>
+            <td>${(silMap[s]||[]).length}건</td>
+          </tr>`;
+        }).join('')}
+        <tr class="total-row"><td>합계</td><td>${prevTotal?fmtWS(prevTotal)+'원':'-'}</td><td>${fmtWS(total)}원</td>
+          <td class="${(total-prevTotal)>0?'up':'dn'}">${(total-prevTotal)>=0?'+':''}${fmtWS(total-prevTotal)}원</td>
+          <td class="${(total-prevTotal)>0?'up':'dn'}" style="font-weight:700">${prevTotal?fmtP(pct(total,prevTotal)):'-'}</td>
+          <td>${curRecs.length}건</td></tr>
+        </tbody>
+      </table></div>`;
+  } else {
+    document.getElementById('sil-delta').innerHTML='<div class="empty" style="padding:16px">2개월 이상 데이터가 있으면 전월 대비를 표시합니다.</div>';
+  }
+
+  // ── 부서별 ────────────────────────────────────────────
+  const deptMap  = groupBy(curRecs,'dept');
+  const deptNames= Object.keys(deptMap).sort((a,b)=>{
+    const aAmt=deptMap[a].reduce((s,r)=>s+r.amount,0);
+    const bAmt=deptMap[b].reduce((s,r)=>s+r.amount,0);
+    return bAmt-aAmt;
+  });
+  const deptTotal= curRecs.reduce((s,r)=>s+r.amount,0);
+  const maxDept  = deptMap[deptNames[0]]?.reduce((s,r)=>s+r.amount,0)||1;
+
+  document.getElementById('dept-rank').innerHTML = deptNames.map((d,i)=>{
+    const amt   = deptMap[d].reduce((s,r)=>s+r.amount,0);
+    const pAmt  = (groupBy(prevRecs,'dept')[d]||[]).reduce((s,r)=>s+r.amount,0);
+    const delta = pct(amt,pAmt);
+    const color = SIL_COLORS[i%SIL_COLORS.length];
+    return `<div class="rank-item">
+      <div class="rank-num">${i+1}</div>
+      <div class="rank-name">${d}</div>
+      <div class="rank-bar-wrap"><div class="rank-bar" style="width:${(amt/maxDept*100).toFixed(1)}%;background:${color}88"></div></div>
+      <div class="rank-val">${fmtWS(amt)}원</div>
+      <div class="rank-delta ${delta!=null?(delta>0?'up':'dn'):'nu'}">${delta!=null?fmtP(delta):'-'}</div>
+    </div>`;
+  }).join('');
+
+  // 부서별 월별 추이
+  const deptColors = {};
+  deptNames.forEach((d,i)=>{ deptColors[d]=SIL_COLORS[i%SIL_COLORS.length]; });
+  document.getElementById('dept-trend-leg').innerHTML = deptNames.map(d=>`
+    <span><span class="ldot" style="background:${deptColors[d]}"></span>${d}</span>`).join('');
+
+  mkChart('c-dept-trend',{
+    type:'line',
+    data:{
+      labels: months.map(m=>`${m.slice(0,4)}.${m.slice(4)}`),
+      datasets: deptNames.map(d=>({
+        label:d,
+        data:months.map(m=>(groupBy(allMonths[m]||[],'dept')[d]||[]).reduce((s,r)=>s+r.amount,0)),
+        borderColor:deptColors[d],backgroundColor:'transparent',
+        borderWidth:2.5,pointRadius:3,tension:.4,
+      }))
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmtWS(ctx.raw)}원`}}},
+      scales:{x:xAx,y:yAx(v=>v.toLocaleString()+'원')}}
+  });
+
+  // ── 개인별 랭킹 ───────────────────────────────────────
+  const personMap  = groupBy(curRecs,'name');
+  const personNames= Object.keys(personMap).sort((a,b)=>
+    personMap[b].reduce((s,r)=>s+r.amount,0)-personMap[a].reduce((s,r)=>s+r.amount,0));
+  const maxPerson = personMap[personNames[0]]?.reduce((s,r)=>s+r.amount,0)||1;
+
+  document.getElementById('person-rank').innerHTML = personNames.map((p,i)=>{
+    const amt   = personMap[p].reduce((s,r)=>s+r.amount,0);
+    const pAmt  = (groupBy(prevRecs,'name')[p]||[]).reduce((s,r)=>s+r.amount,0);
+    const delta = pct(amt,pAmt);
+    const dept  = personMap[p][0]?.dept||'';
+    const sil   = personMap[p][0]?.sil||'';
+    const color = silColorMap[sil]||'#888';
+    return `<div class="rank-item">
+      <div class="rank-num">${i+1}</div>
+      <div class="rank-name">
+        ${p}
+        <span style="font-size:10px;color:var(--muted);font-weight:400;margin-left:4px">${dept}</span>
+      </div>
+      <div class="rank-bar-wrap"><div class="rank-bar" style="width:${(amt/maxPerson*100).toFixed(1)}%;background:${color}88"></div></div>
+      <div class="rank-val">${fmtWS(amt)}원</div>
+      <div class="rank-delta ${delta!=null?(delta>0?'up':'dn'):'nu'}">${delta!=null?fmtP(delta):'-'}</div>
+    </div>`;
+  }).join('');
+
+  // ── 카테고리 ─────────────────────────────────────────
+  const catMap   = groupBy(curRecs,'category');
+  const catNames = Object.keys(catMap).sort((a,b)=>
+    catMap[b].reduce((s,r)=>s+r.amount,0)-catMap[a].reduce((s,r)=>s+r.amount,0));
+  const catVals  = catNames.map(c=>catMap[c].reduce((s,r)=>s+r.amount,0));
+  const catTotal = catVals.reduce((a,b)=>a+b,0);
+  const catColors= catNames.map(c=>{
+    const rule = CAT_RULES.find(r=>r.cat===c);
+    return rule?rule.color:'#888780';
+  });
+
+  mkChart('c-cat-pie',{
+    type:'doughnut',
+    data:{labels:catNames,datasets:[{data:catVals,backgroundColor:catColors,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>catTotal?`${ctx.label}: ${(ctx.raw/catTotal*100).toFixed(1)}%`:'-'}}}}
+  });
+  document.getElementById('cat-pie-leg').innerHTML = catNames.map((c,i)=>`
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)">
+      <span><span class="ldot" style="background:${catColors[i]}"></span>${c}</span>
+      <span>${fmtWS(catVals[i])}원 · ${catTotal?(catVals[i]/catTotal*100).toFixed(1):0}%</span>
+    </div>`).join('');
+
+  mkChart('c-cat-bar',{
+    type:'bar',
+    data:{labels:catNames,datasets:[{data:catVals,backgroundColor:catColors,borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${fmtW(ctx.raw)}`}}},
+      scales:{x:{...xAx,ticks:{...xAx.ticks,maxRotation:30}},y:yAx(v=>v.toLocaleString()+'원')}}
+  });
+
+  // ── 월별 추이 ─────────────────────────────────────────
+  const trendLabels = months.map(m=>`${m.slice(0,4)}.${m.slice(4)}`);
+  const trendVals   = months.map(m=>(allMonths[m]||[]).reduce((s,r)=>s+r.amount,0));
+  const trendCnts   = months.map(m=>(allMonths[m]||[]).length);
+
+  mkChart('c-trend',{
+    type:'bar',
+    data:{labels:trendLabels,datasets:[
+      {type:'line',label:'건수',data:trendCnts,borderColor:'#F27B50',backgroundColor:'transparent',
+       borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#F27B50',pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,yAxisID:'y1',order:1},
+      {label:'총사용액',data:trendVals,
+       backgroundColor:months.map(m=>m===selMonth?'rgba(43,78,191,0.85)':'rgba(43,78,191,0.3)'),borderRadius:5,yAxisID:'y',order:2},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.dataset.label==='건수'?`건수: ${ctx.raw}건`:`총사용액: ${fmtW(ctx.raw)}`}}},
+      scales:{x:xAx,y:{...yAx(v=>v.toLocaleString()+'원'),position:'left'},y1:{ticks:{font:{size:10},color:'#A89880',callback:v=>v+'건'},grid:{display:false},border:{display:false},position:'right'}}}
+  });
+
+  // 실별 월별 추이
+  document.getElementById('sil-trend-leg').innerHTML = allSils.map(s=>`
+    <span><span class="ldot" style="background:${silColorMap[s]||'#888'}"></span>${s}</span>`).join('');
+
+  mkChart('c-sil-trend',{
+    type:'line',
+    data:{
+      labels:trendLabels,
+      datasets:allSils.map(s=>({
+        label:s,
+        data:months.map(m=>(groupBy(allMonths[m]||[],'sil')[s]||[]).reduce((a,r)=>a+r.amount,0)),
+        borderColor:silColorMap[s]||'#888',backgroundColor:'transparent',
+        borderWidth:2.5,pointRadius:3,tension:.4,
+      }))
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmtWS(ctx.raw)}원`}}},
+      scales:{x:xAx,y:yAx(v=>v.toLocaleString()+'원')}}
+  });
+
+  // ── 상세 내역 ─────────────────────────────────────────
+  // 카테고리 필터 옵션 업데이트
+  const catFilterEl = document.getElementById('cat-filter');
+  const existCats = [...new Set(curRecs.map(r=>r.category))].sort();
+  catFilterEl.innerHTML = '<option value="">전체 카테고리</option>' +
+    existCats.map(c=>`<option value="${c}">${c}</option>`).join('');
+
+  renderDetail(curRecs);
+
+  // 검색/필터 이벤트
+  document.getElementById('search-input').oninput =
+  document.getElementById('cat-filter').onchange = ()=>{
+    const q   = document.getElementById('search-input').value.toLowerCase();
+    const cat = document.getElementById('cat-filter').value;
+    const filtered = curRecs.filter(r=>
+      (!q || r.merchant.toLowerCase().includes(q) || r.name.toLowerCase().includes(q) || (r.content||'').toLowerCase().includes(q)) &&
+      (!cat || r.category===cat)
+    );
+    renderDetail(filtered);
+  };
+}
+
+function renderDetail(recs){
+  const sorted = [...recs].sort((a,b)=>b.amount-a.amount);
+  const thead = `<thead><tr>
+    <th style="text-align:left">사용일</th>
+    <th style="text-align:left">이름</th>
+    <th style="text-align:left">실</th>
+    <th style="text-align:left">부서</th>
+    <th style="text-align:left">가맹점명</th>
+    <th style="text-align:left">카테고리</th>
+    <th>금액</th>
+    <th style="text-align:left">내용</th>
+  </tr></thead>`;
+  const tbody = `<tbody>${sorted.map(r=>{
+    const rule = CAT_RULES.find(x=>x.cat===r.category);
+    const catColor = rule?rule.color:'#888780';
+    return `<tr>
+      <td style="text-align:left">${r.date}</td>
+      <td style="text-align:left;font-weight:600">${r.name}</td>
+      <td style="text-align:left"><span style="font-size:10px;color:${silColorMap[r.sil]||'#888'};font-weight:700">${r.sil}</span></td>
+      <td style="text-align:left;color:var(--muted)">${r.dept}</td>
+      <td style="text-align:left">${r.merchant}</td>
+      <td style="text-align:left"><span class="cat-badge" style="background:${catColor}22;color:${catColor}">${r.category}</span></td>
+      <td style="font-weight:600">${fmtWS(r.amount)}원</td>
+      <td style="text-align:left;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis">${r.content||'-'}</td>
+    </tr>`;
+  }).join('')}</tbody>`;
+  document.getElementById('detail-tbl').innerHTML = thead+tbody;
+}
+
+// ── 유틸: groupBy ─────────────────────────────────────────
+function groupBy(arr, key){
+  return arr.reduce((acc,item)=>{
+    const k = item[key]||'미분류';
+    if(!acc[k]) acc[k]=[];
+    acc[k].push(item);
+    return acc;
+  },{});
+}
+
+function selectMonth(m){ selMonth=m; render(); }
+
+// 탭
+document.querySelector('.tabs').addEventListener('click',e=>{
+  const b=e.target.closest('.tab'); if(!b) return;
+  const t=b.dataset.t;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
+  ['overview','dept','person','cat','trend','detail'].forEach(x=>{
+    document.getElementById('pane-'+x).style.display=x===t?'block':'none';
+  });
+});
+
+// 파일
+document.getElementById('finput').addEventListener('change',e=>{
+  if(e.target.files[0]) handleFile(e.target.files[0]);
+});
+const dz=document.getElementById('dropzone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);});
+dz.addEventListener('click',()=>document.getElementById('finput').click());
+
+window.selectMonth=selectMonth;
+
+// ── 초기 로드 ─────────────────────────────────────────────
+(async()=>{
+  try{
+    const result = await apiGet();
+    allMonths = result.data_card || {};
+    document.getElementById('loading').style.display='none';
+    if(Object.keys(allMonths).length===0){
+      document.getElementById('dropzone').style.display='block';
+    } else {
+      render();
+    }
+  }catch(err){
+    document.getElementById('loading').innerHTML=`
+      <div style="color:var(--red);text-align:center;padding:40px">
+        ⚠️ 서버 연결 실패<br><small style="color:var(--muted)">${err.message}</small>
+      </div>`;
+  }
+})();
+</script>
+</body>
+</html>
