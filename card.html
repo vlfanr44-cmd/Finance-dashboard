@@ -514,8 +514,8 @@ function render(){
     `${selMonth.slice(0,4)}년 ${parseInt(selMonth.slice(4))}월 · ${curRecs.length}건`;
 
   // ── KPI ──────────────────────────────────────────────
-  const total    = curRecs.reduce((s,r)=>s+r.amount,0);
-  const prevTotal= prevRecs.reduce((s,r)=>s+r.amount,0);
+  const total    = curRecs.reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0);
+  const prevTotal= prevRecs.reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0);
   const totalDelta = pct(total, prevTotal);
   const persons  = new Set(curRecs.map(r=>r.name)).size;
   const avgPer   = persons>0 ? total/persons : 0;
@@ -537,7 +537,7 @@ function render(){
   // ── 실별 현황 ─────────────────────────────────────────
   const silMap  = groupBy(curRecs, 'sil');
   const silNames= Object.keys(silMap).sort();
-  const silVals = silNames.map(s=>silMap[s].reduce((a,r)=>a+r.amount,0));
+  const silVals = silNames.map(s=>silMap[s].reduce((a,r)=>a+r.am||r.am||r.amount||0||0,0));
   const silTotal= silVals.reduce((a,b)=>a+b,0);
 
   mkChart('c-sil-bar',{
@@ -567,7 +567,7 @@ function render(){
       <div class="twrap"><table>
         <thead><tr><th>실</th><th>전월</th><th>이번달</th><th>증감</th><th>증감률</th><th>건수</th></tr></thead>
         <tbody>${silNames.map((s,i)=>{
-          const pv = (prevSilMap[s]||[]).reduce((a,r)=>a+r.amount,0);
+          const pv = (prevSilMap[s]||[]).reduce((a,r)=>a+r.am||r.am||r.amount||0||0,0);
           const cv = silVals[i];
           const d  = cv-pv; const pp=pct(cv,pv);
           const cls= d>0?'up':'dn'; // 카드비 증가=나쁨
@@ -593,16 +593,16 @@ function render(){
   // ── 부서별 ────────────────────────────────────────────
   const deptMap  = groupBy(curRecs,'dept');
   const deptNames= Object.keys(deptMap).sort((a,b)=>{
-    const aAmt=deptMap[a].reduce((s,r)=>s+r.amount,0);
-    const bAmt=deptMap[b].reduce((s,r)=>s+r.amount,0);
+    const aAmt=deptMap[a].reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0);
+    const bAmt=deptMap[b].reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0);
     return bAmt-aAmt;
   });
-  const deptTotal= curRecs.reduce((s,r)=>s+r.amount,0);
-  const maxDept  = deptMap[deptNames[0]]?.reduce((s,r)=>s+r.amount,0)||1;
+  const deptTotal= curRecs.reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0);
+  const maxDept  = deptMap[deptNames[0]]?.reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0)||1;
 
   document.getElementById('dept-rank').innerHTML = deptNames.map((d,i)=>{
-    const amt   = deptMap[d].reduce((s,r)=>s+r.amount,0);
-    const pAmt  = (groupBy(prevRecs,'dept')[d]||[]).reduce((s,r)=>s+r.amount,0);
+    const amt   = deptMap[d].reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0);
+    const pAmt  = (groupBy(prevRecs,'dept')[d]||[]).reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0);
     const delta = pct(amt,pAmt);
     const color = SIL_COLORS[i%SIL_COLORS.length];
     return `<div class="rank-item">
@@ -626,7 +626,7 @@ function render(){
       labels: months.map(m=>`${m.slice(0,4)}.${m.slice(4)}`),
       datasets: deptNames.map(d=>({
         label:d,
-        data:months.map(m=>(groupBy(allMonths[m]||[],'dept')[d]||[]).reduce((s,r)=>s+r.amount,0)),
+        data:months.map(m=>(groupBy(allMonths[m]||[],'dept')[d]||[]).reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0)),
         borderColor:deptColors[d],backgroundColor:'transparent',
         borderWidth:2.5,pointRadius:3,tension:.4,
       }))
@@ -639,12 +639,12 @@ function render(){
   // ── 개인별 랭킹 ───────────────────────────────────────
   const personMap  = groupBy(curRecs,'name');
   const personNames= Object.keys(personMap).sort((a,b)=>
-    personMap[b].reduce((s,r)=>s+r.amount,0)-personMap[a].reduce((s,r)=>s+r.amount,0));
-  const maxPerson = personMap[personNames[0]]?.reduce((s,r)=>s+r.amount,0)||1;
+    personMap[b].reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0)-personMap[a].reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0));
+  const maxPerson = personMap[personNames[0]]?.reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0)||1;
 
   document.getElementById('person-rank').innerHTML = personNames.map((p,i)=>{
-    const amt   = personMap[p].reduce((s,r)=>s+r.amount,0);
-    const pAmt  = (groupBy(prevRecs,'name')[p]||[]).reduce((s,r)=>s+r.amount,0);
+    const amt   = personMap[p].reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0);
+    const pAmt  = (groupBy(prevRecs,'name')[p]||[]).reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0);
     const delta = pct(amt,pAmt);
     const dept  = personMap[p][0]?.dept||'';
     const sil   = personMap[p][0]?.sil||'';
@@ -664,8 +664,8 @@ function render(){
   // ── 카테고리 ─────────────────────────────────────────
   const catMap   = groupBy(curRecs,'category');
   const catNames = Object.keys(catMap).sort((a,b)=>
-    catMap[b].reduce((s,r)=>s+r.amount,0)-catMap[a].reduce((s,r)=>s+r.amount,0));
-  const catVals  = catNames.map(c=>catMap[c].reduce((s,r)=>s+r.amount,0));
+    catMap[b].reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0)-catMap[a].reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0));
+  const catVals  = catNames.map(c=>catMap[c].reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0));
   const catTotal = catVals.reduce((a,b)=>a+b,0);
   const catColors= catNames.map(c=>{
     const rule = CAT_RULES.find(r=>r.cat===c);
@@ -694,7 +694,7 @@ function render(){
 
   // ── 월별 추이 ─────────────────────────────────────────
   const trendLabels = months.map(m=>`${m.slice(0,4)}.${m.slice(4)}`);
-  const trendVals   = months.map(m=>(allMonths[m]||[]).reduce((s,r)=>s+r.amount,0));
+  const trendVals   = months.map(m=>(allMonths[m]||[]).reduce((s,r)=>s+r.am||r.am||r.amount||0||0,0));
   const trendCnts   = months.map(m=>(allMonths[m]||[]).length);
 
   mkChart('c-trend',{
@@ -720,7 +720,7 @@ function render(){
       labels:trendLabels,
       datasets:allSils.map(s=>({
         label:s,
-        data:months.map(m=>(groupBy(allMonths[m]||[],'sil')[s]||[]).reduce((a,r)=>a+r.amount,0)),
+        data:months.map(m=>(groupBy(allMonths[m]||[],'sil')[s]||[]).reduce((a,r)=>a+r.am||r.am||r.amount||0||0,0)),
         borderColor:silColorMap[s]||'#888',backgroundColor:'transparent',
         borderWidth:2.5,pointRadius:3,tension:.4,
       }))
@@ -733,7 +733,7 @@ function render(){
   // ── 상세 내역 ─────────────────────────────────────────
   // 카테고리 필터 옵션 업데이트
   const catFilterEl = document.getElementById('cat-filter');
-  const existCats = [...new Set(curRecs.map(r=>r.category))].sort();
+  const existCats = [...new Set(curRecs.map(r=>r.ct||r.category||'기타'))].sort();
   catFilterEl.innerHTML = '<option value="">전체 카테고리</option>' +
     existCats.map(c=>`<option value="${c}">${c}</option>`).join('');
 
@@ -745,8 +745,8 @@ function render(){
     const q   = document.getElementById('search-input').value.toLowerCase();
     const cat = document.getElementById('cat-filter').value;
     const filtered = curRecs.filter(r=>
-      (!q || r.merchant.toLowerCase().includes(q) || r.name.toLowerCase().includes(q) || (r.content||'').toLowerCase().includes(q)) &&
-      (!cat || r.category===cat)
+      (!q || r.mc||r.merchant||''.toLowerCase().includes(q) || r.name.toLowerCase().includes(q) || (r.tx||r.content||''||'').toLowerCase().includes(q)) &&
+      (!cat || r.ct||r.category||'기타'===cat)
     );
     renderDetail(filtered);
   };
@@ -765,26 +765,31 @@ function renderDetail(recs){
     <th style="text-align:left">내용</th>
   </tr></thead>`;
   const tbody = `<tbody>${sorted.map(r=>{
-    const rule = CAT_RULES.find(x=>x.cat===r.category);
+    const rule = CAT_RULES.find(x=>x.cat===r.ct||r.category||'기타');
     const catColor = rule?rule.color:'#888780';
     return `<tr>
-      <td style="text-align:left">${r.date}</td>
-      <td style="text-align:left;font-weight:600">${r.name}</td>
-      <td style="text-align:left"><span style="font-size:10px;color:${silColorMap[r.sil]||'#888'};font-weight:700">${r.sil}</span></td>
-      <td style="text-align:left;color:var(--muted)">${r.dept}</td>
-      <td style="text-align:left">${r.merchant}</td>
-      <td style="text-align:left"><span class="cat-badge" style="background:${catColor}22;color:${catColor}">${r.category}</span></td>
-      <td style="font-weight:600">${fmtWS(r.amount)}원</td>
-      <td style="text-align:left;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis">${r.content||'-'}</td>
+      <td style="text-align:left">${r.dt||r.date}</td>
+      <td style="text-align:left;font-weight:600">${r.nm||r.name}</td>
+      <td style="text-align:left"><span style="font-size:10px;color:${silColorMap[r.sil]||'#888'};font-weight:700">${r.sl||r.sil}</span></td>
+      <td style="text-align:left;color:var(--muted)">${r.dp||r.dept}</td>
+      <td style="text-align:left">${r.mc||r.merchant||''}</td>
+      <td style="text-align:left"><span class="cat-badge" style="background:${catColor}22;color:${catColor}">${r.ct||r.category||'기타'}</span></td>
+      <td style="font-weight:600">${fmtWS(r.am||r.amount||0)}원</td>
+      <td style="text-align:left;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis">${r.tx||r.content||''||'-'}</td>
     </tr>`;
   }).join('')}</tbody>`;
   document.getElementById('detail-tbl').innerHTML = thead+tbody;
 }
 
 // ── 유틸: groupBy ─────────────────────────────────────────
+// 축약 필드명 매핑
+const FIELD_MAP = {name:'nm',dept:'dp',sil:'sl',cardNo:'cn',merchant:'mc',amount:'am',category:'ct',content:'tx',date:'dt'};
+function gf(item, field){ return item[FIELD_MAP[field]||field]; }
+
 function groupBy(arr, key){
+  const fk = FIELD_MAP[key]||key;
   return arr.reduce((acc,item)=>{
-    const k = item[key]||'미분류';
+    const k = item[fk]||'미분류';
     if(!acc[k]) acc[k]=[];
     acc[k].push(item);
     return acc;
