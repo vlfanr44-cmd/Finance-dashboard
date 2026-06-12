@@ -319,37 +319,39 @@ function toast(msg,type='ok'){
 })();
 
 // ── API ──────────────────────────────────────────────────
-function xhrRequest(url, method, body){
-  return new Promise((res,rej)=>{
-    const xhr = new XMLHttpRequest();
-    xhr.open(method, url, true);
-    xhr.setRequestHeader('Content-Type','text/plain');
-    xhr.onload = ()=>{
-      try{ res(JSON.parse(xhr.responseText)); }
-      catch(e){ rej(new Error('응답 파싱 오류: '+xhr.responseText.slice(0,100))); }
-    };
-    xhr.onerror = ()=>rej(new Error('네트워크 오류'));
-    xhr.ontimeout = ()=>rej(new Error('요청 시간 초과'));
-    xhr.timeout = 30000;
-    xhr.send(body||null);
-  });
-}
 async function apiGet(){
-  const j=await xhrRequest(API+'?action=get','GET');
+  const r=await fetch(API+'?action=get');
+  const j=await r.json();
   if(!j.ok) throw new Error(j.error); return j;
 }
 async function apiSave(key,value){
-  const j=await xhrRequest(API,'POST',JSON.stringify({action:'save',key,value}));
-  if(!j.ok) throw new Error(j.error);
+  const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key,value})});
+  const j=await r.json(); if(!j.ok) throw new Error(j.error);
 }
 async function apiGetCardMonths(){
-  const j=await xhrRequest(API+'?action=getCardAll','GET');
+  const r=await fetch(API+'?action=getCardAll');
+  const j=await r.json();
   if(!j.ok) throw new Error(j.error);
   return j.data_card||{};
 }
 async function apiSaveCardMonth(yyyymm, records){
-  const j=await xhrRequest(API,'POST',JSON.stringify({action:'save',key:'__card_'+yyyymm+'__',value:records}));
-  if(!j.ok) throw new Error(j.error);
+  const CHUNK = 80; // 80건씩 나눠서 저장
+  if(records.length <= CHUNK){
+    // 소량이면 한번에 저장
+    const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key:'__card_'+yyyymm+'__',value:records})});
+    const j=await r.json(); if(!j.ok) throw new Error(j.error);
+  } else {
+    // 청크로 나눠서 저장 후 병합
+    // 1. 먼저 빈 배열로 초기화
+    const r0=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key:'__card_'+yyyymm+'__',value:[]})});
+    const j0=await r0.json(); if(!j0.ok) throw new Error(j0.error);
+    // 2. 청크별로 append
+    for(let i=0; i<records.length; i+=CHUNK){
+      const chunk = records.slice(i, i+CHUNK);
+      const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'appendCard',key:'__card_'+yyyymm+'__',value:chunk})});
+      const j=await r.json(); if(!j.ok) throw new Error(j.error);
+    }
+  }
 }
 
 // ── 엑셀 파싱 ────────────────────────────────────────────
