@@ -327,6 +327,17 @@ async function apiSave(key,value){
   const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key,value})});
   const j=await r.json(); if(!j.ok) throw new Error(j.error);
 }
+async function apiGetCardMonths(){
+  // 월별 분리된 카드 데이터 전체 조합
+  const r=await fetch(API+'?action=getCardAll'); const j=await r.json();
+  if(!j.ok) throw new Error(j.error);
+  return j.data_card||{};
+}
+async function apiSaveCardMonth(yyyymm, records){
+  // 월별로 분리 저장
+  const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key:'__card_'+yyyymm+'__',value:records})});
+  const j=await r.json(); if(!j.ok) throw new Error(j.error);
+}
 
 // ── 엑셀 파싱 ────────────────────────────────────────────
 function parseCardFile(wb){
@@ -423,12 +434,11 @@ async function handleFile(file){
       rd.readAsBinaryString(file);
     });
 
-    // 기존 데이터와 병합
-    const result = await apiGet();
-    const stored = result.data_card || {};
-    Object.keys(data).forEach(ym=>{ stored[ym] = data[ym]; });
-    await apiSave('__data_card__', stored);
-    allMonths = stored;
+    // 월별로 분리 저장
+    for(const ym of Object.keys(data)){
+      await apiSaveCardMonth(ym, data[ym]);
+    }
+    allMonths = await apiGetCardMonths();
     selMonth = null;
     render();
     const months = Object.keys(data).sort();
@@ -780,8 +790,7 @@ window.selectMonth=selectMonth;
 // ── 초기 로드 ─────────────────────────────────────────────
 (async()=>{
   try{
-    const result = await apiGet();
-    allMonths = result.data_card || {};
+    allMonths = await apiGetCardMonths();
     document.getElementById('loading').style.display='none';
     if(Object.keys(allMonths).length===0){
       document.getElementById('dropzone').style.display='block';
