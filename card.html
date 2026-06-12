@@ -319,24 +319,37 @@ function toast(msg,type='ok'){
 })();
 
 // ── API ──────────────────────────────────────────────────
+function xhrRequest(url, method, body){
+  return new Promise((res,rej)=>{
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url, true);
+    xhr.setRequestHeader('Content-Type','text/plain');
+    xhr.onload = ()=>{
+      try{ res(JSON.parse(xhr.responseText)); }
+      catch(e){ rej(new Error('응답 파싱 오류: '+xhr.responseText.slice(0,100))); }
+    };
+    xhr.onerror = ()=>rej(new Error('네트워크 오류'));
+    xhr.ontimeout = ()=>rej(new Error('요청 시간 초과'));
+    xhr.timeout = 30000;
+    xhr.send(body||null);
+  });
+}
 async function apiGet(){
-  const r=await fetch(API+'?action=get'); const j=await r.json();
+  const j=await xhrRequest(API+'?action=get','GET');
   if(!j.ok) throw new Error(j.error); return j;
 }
 async function apiSave(key,value){
-  const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key,value})});
-  const j=await r.json(); if(!j.ok) throw new Error(j.error);
+  const j=await xhrRequest(API,'POST',JSON.stringify({action:'save',key,value}));
+  if(!j.ok) throw new Error(j.error);
 }
 async function apiGetCardMonths(){
-  // 월별 분리된 카드 데이터 전체 조합
-  const r=await fetch(API+'?action=getCardAll'); const j=await r.json();
+  const j=await xhrRequest(API+'?action=getCardAll','GET');
   if(!j.ok) throw new Error(j.error);
   return j.data_card||{};
 }
 async function apiSaveCardMonth(yyyymm, records){
-  // 월별로 분리 저장
-  const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key:'__card_'+yyyymm+'__',value:records})});
-  const j=await r.json(); if(!j.ok) throw new Error(j.error);
+  const j=await xhrRequest(API,'POST',JSON.stringify({action:'save',key:'__card_'+yyyymm+'__',value:records}));
+  if(!j.ok) throw new Error(j.error);
 }
 
 // ── 엑셀 파싱 ────────────────────────────────────────────
@@ -362,10 +375,22 @@ function parseCardFile(wb){
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1});
     if(rows.length < 2) return;
 
-    // 카드번호 4자리 추출 (시트명 앞 4자리)
-    const cardNo = sn.replace(/[^0-9]/g,'').slice(0,4).padStart(4,'0');
+    // 카드번호 추출 - 쉼표로 여러 번호가 있는 경우도 처리 (예: "4106,3201심창우")
+    // 숫자만 추출 후 4자리씩 나누기
+    const allNums = sn.replace(/[^0-9,]/g,'').split(',');
+    const cardNo = allNums[0].trim().padStart(4,'0'); // 첫 번째 카드번호 기준
     const isPublic = sn.includes('공용');
-    const mapInfo = mapping[cardNo] || {name: sn, dept:'미분류', sil:'미분류'};
+    // 매핑에서 찾기 - 여러 카드번호 중 하나라도 매핑되면 사용
+    let mapInfo = null;
+    for(const num of allNums){
+      const key = num.trim().replace(/[^0-9]/g,'').slice(0,4).padStart(4,'0');
+      if(mapping[key]){ mapInfo = mapping[key]; break; }
+    }
+    if(!mapInfo){
+      // 시트명에서 이름 추출 시도
+      const nameMatch = sn.replace(/[0-9,]/g,'').trim();
+      mapInfo = {name: nameMatch||sn, dept:'미분류', sil:'미분류'};
+    }
 
     rows.slice(1).forEach(row=>{
       // 유효 행 체크: 사용일자(col2)와 이용금액(col6) 필수
