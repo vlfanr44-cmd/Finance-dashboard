@@ -336,22 +336,20 @@ async function apiGetCardMonths(){
   return j.data_card||{};
 }
 async function apiSaveCardMonth(yyyymm, records){
-  const CHUNK = 80; // 80건씩 나눠서 저장
-  if(records.length <= CHUNK){
-    // 소량이면 한번에 저장
-    const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key:'__card_'+yyyymm+'__',value:records})});
+  const CHUNK = 70;
+  const chunks = [];
+  for(let i=0; i<records.length; i+=CHUNK) chunks.push(records.slice(i,i+CHUNK));
+  
+  // 청크 인덱스 목록 저장 (메타데이터)
+  const meta = {count: chunks.length, total: records.length};
+  const rm = await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key:'__card_'+yyyymm+'_meta__',value:meta})});
+  const jm = await rm.json(); if(!jm.ok) throw new Error(jm.error);
+  
+  // 각 청크를 별도 키로 저장 (연속 요청 사이 딜레이)
+  for(let i=0; i<chunks.length; i++){
+    await new Promise(r=>setTimeout(r, 500)); // 0.5초 딜레이
+    const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key:'__card_'+yyyymm+'_'+i+'__',value:chunks[i]})});
     const j=await r.json(); if(!j.ok) throw new Error(j.error);
-  } else {
-    // 청크로 나눠서 저장 후 병합
-    // 1. 먼저 빈 배열로 초기화
-    const r0=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key:'__card_'+yyyymm+'__',value:[]})});
-    const j0=await r0.json(); if(!j0.ok) throw new Error(j0.error);
-    // 2. 청크별로 append
-    for(let i=0; i<records.length; i+=CHUNK){
-      const chunk = records.slice(i, i+CHUNK);
-      const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'appendCard',key:'__card_'+yyyymm+'__',value:chunk})});
-      const j=await r.json(); if(!j.ok) throw new Error(j.error);
-    }
   }
 }
 
