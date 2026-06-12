@@ -277,7 +277,10 @@ function parseCardFile(wb){
       const parts=ds.split('-');
       if(parts.length<3)return;
       const yyyymm=parts[0]+parts[1].padStart(2,'0');
-      const dept=isPublic&&row[10]?String(row[10]).trim()||mapInfo.dept:mapInfo.dept;
+      // 공용카드 부서 컬럼 값이 부서매핑에 존재하는 부서인지 확인
+      const validDepts = new Set(Object.values(mapping).map(m=>m.dept));
+      const rawDept = isPublic&&row[10]?String(row[10]).trim():'';
+      const dept = rawDept && validDepts.has(rawDept) ? rawDept : mapInfo.dept;
       const merchant=String(row[5]||'').trim();
       const content=String(row[9]||'').trim();
       if(!grouped[yyyymm])grouped[yyyymm]=[];
