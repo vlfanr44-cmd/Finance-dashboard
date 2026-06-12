@@ -142,6 +142,7 @@ tr.total-row td{font-weight:700;background:var(--card2)}
       <button class="tab" data-t="dept">부서별</button>
       <button class="tab" data-t="person">개인별</button>
       <button class="tab" data-t="cat">카테고리</button>
+      <button class="tab" data-t="top">가맹점 Top10</button>
       <button class="tab" data-t="trend">월별 추이</button>
       <button class="tab" data-t="detail">상세 내역</button>
     </div>
@@ -165,6 +166,24 @@ tr.total-row td{font-weight:700;background:var(--card2)}
         <div class="panel"><div class="ptitle">카테고리별 금액</div><div style="position:relative;height:260px"><canvas id="c-cat-bar"></canvas></div></div>
       </div>
     </div>
+    <div id="pane-top" style="display:none">
+      <div class="g2">
+        <div class="panel">
+          <div class="ptitle">가맹점별 Top 10 (사용금액)</div>
+          <div id="top-merchant-amt"></div>
+        </div>
+        <div class="panel">
+          <div class="ptitle">가맹점별 Top 10 (건수)</div>
+          <div id="top-merchant-cnt"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">가맹점별 Top 10 월별 추이</div>
+        <div class="legend" id="top-trend-leg"></div>
+        <div style="position:relative;height:260px"><canvas id="c-top-trend"></canvas></div>
+      </div>
+    </div>
+
     <div id="pane-trend" style="display:none">
       <div class="panel"><div class="ptitle">월별 총 사용금액 추이</div><div style="position:relative;height:260px"><canvas id="c-trend"></canvas></div></div>
       <div class="panel"><div class="ptitle">실별 월별 추이</div><div class="legend" id="sil-trend-leg"></div><div style="position:relative;height:260px"><canvas id="c-sil-trend"></canvas></div></div>
@@ -525,6 +544,7 @@ function render(){
   // 상세내역
   const existCats=[...new Set(curRecs.map(r=>r.category))].sort();
   document.getElementById('cat-filter').innerHTML='<option value="">전체 카테고리</option>'+existCats.map(c=>`<option value="${c}">${c}</option>`).join('');
+  renderTop(curRecs, prevRecs);
   renderDetail(curRecs);
   document.getElementById('search-input').oninput=
   document.getElementById('cat-filter').onchange=()=>{
@@ -532,6 +552,71 @@ function render(){
     const cat=document.getElementById('cat-filter').value;
     renderDetail(curRecs.filter(r=>(!q||r.merchant.toLowerCase().includes(q)||r.name.toLowerCase().includes(q)||(r.content||'').toLowerCase().includes(q))&&(!cat||r.category===cat)));
   };
+}
+
+function renderTop(recs, prevRecs){
+  // 가맹점별 집계
+  const amtMap={}, cntMap={};
+  recs.forEach(r=>{
+    const m=r.merchant||'기타';
+    amtMap[m]=(amtMap[m]||0)+r.amount;
+    cntMap[m]=(cntMap[m]||0)+1;
+  });
+  const prevAmtMap={};
+  prevRecs.forEach(r=>{ const m=r.merchant||'기타'; prevAmtMap[m]=(prevAmtMap[m]||0)+r.amount; });
+
+  // 금액 Top10
+  const topAmt=Object.entries(amtMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const maxAmt=topAmt[0]?topAmt[0][1]:1;
+  document.getElementById('top-merchant-amt').innerHTML=topAmt.map(([m,v],i)=>{
+    const pv=prevAmtMap[m]||0;
+    const delta=pv?((v-pv)/pv*100):null;
+    const cls=delta!=null?(delta>0?'up':'dn'):'nu';
+    const rule=CAT_RULES.find(r=>r.kw.some(kw=>m.toUpperCase().includes(kw.toUpperCase())));
+    const color=rule?rule.color:'#888780';
+    return `<div class="rank-item">
+      <div class="rank-num">${i+1}</div>
+      <div class="rank-name" style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${m}</div>
+      <div class="rank-bar-wrap"><div class="rank-bar" style="width:${(v/maxAmt*100).toFixed(1)}%;background:${color}88"></div></div>
+      <div class="rank-val">${Math.round(v).toLocaleString()}원</div>
+      <div class="rank-delta ${cls}">${delta!=null?fmtP(delta):'-'}</div>
+    </div>`;
+  }).join('');
+
+  // 건수 Top10
+  const topCnt=Object.entries(cntMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const maxCnt=topCnt[0]?topCnt[0][1]:1;
+  document.getElementById('top-merchant-cnt').innerHTML=topCnt.map(([m,v],i)=>{
+    const rule=CAT_RULES.find(r=>r.kw.some(kw=>m.toUpperCase().includes(kw.toUpperCase())));
+    const color=rule?rule.color:'#888780';
+    return `<div class="rank-item">
+      <div class="rank-num">${i+1}</div>
+      <div class="rank-name" style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${m}</div>
+      <div class="rank-bar-wrap"><div class="rank-bar" style="width:${(v/maxCnt*100).toFixed(1)}%;background:${color}88"></div></div>
+      <div class="rank-val">${v}건</div>
+      <div class="rank-delta nu">${Math.round(amtMap[m]||0).toLocaleString()}원</div>
+    </div>`;
+  }).join('');
+
+  // Top5 가맹점 월별 추이
+  const top5=topAmt.slice(0,5).map(([m])=>m);
+  const months=Object.keys(allMonths).sort();
+  const colors=['#2B4EBF','#F27B50','#7B5EA7','#2E7D52','#D97B2E'];
+  document.getElementById('top-trend-leg').innerHTML=top5.map((m,i)=>`<span><span class="ldot" style="background:${colors[i]}"></span>${m.length>15?m.slice(0,15)+'...':m}</span>`).join('');
+  mkChart('c-top-trend',{type:'line',
+    data:{labels:months.map(m=>`${m.slice(0,4)}.${m.slice(4)}`),
+      datasets:top5.map((m,i)=>({
+        label:m,
+        data:months.map(ym=>{
+          const recs=allMonths[ym]||[];
+          return recs.filter(r=>r.merchant===m).reduce((s,r)=>s+r.amount,0);
+        }),
+        borderColor:colors[i],backgroundColor:'transparent',borderWidth:2.5,pointRadius:3,tension:.4,
+      }))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>`${ctx.dataset.label.slice(0,10)}: ${Math.round(ctx.raw).toLocaleString()}원`}}},
+      scales:{x:xAx,y:yAx(v=>v.toLocaleString()+'원')}}
+  });
 }
 
 function renderDetail(recs){
@@ -557,7 +642,7 @@ document.querySelector('.tabs').addEventListener('click',e=>{
   const b=e.target.closest('.tab');if(!b)return;
   const t=b.dataset.t;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
-  ['overview','dept','person','cat','trend','detail'].forEach(x=>{document.getElementById('pane-'+x).style.display=x===t?'block':'none';});
+  ['overview','dept','person','cat','top','trend','detail'].forEach(x=>{document.getElementById('pane-'+x).style.display=x===t?'block':'none';});
 });
 
 document.getElementById('finput').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
