@@ -199,6 +199,23 @@ tr:last-child td{border-bottom:none}
     <div id="pane-plan">
       <!-- KPI 4개 -->
       <div class="kpi-grid" id="plan-kpis" style="grid-template-columns:repeat(4,1fr)"></div>
+
+      <!-- 연간 계획 진행률 -->
+      <div class="panel" id="plan-annual" style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+          <div class="ptitle" style="margin-bottom:0">연간 계획 진행률 — 2026</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)">
+              <span style="display:inline-block;width:12px;height:5px;background:var(--amber);border-radius:2px"></span>누계 실적
+            </span>
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--purple);font-weight:600">
+              <span style="display:inline-block;width:3px;height:12px;background:var(--purple);border-radius:1px"></span>목표 페이스
+            </span>
+          </div>
+        </div>
+        <div id="plan-annual-items" style="display:flex;flex-direction:column;gap:20px"></div>
+      </div>
+
       <!-- 연말 예상치 -->
       <div class="panel" style="margin-bottom:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -233,21 +250,6 @@ tr:last-child td{border-bottom:none}
           <div class="ptitle" style="margin-top:18px">항목별 달성률 — 당월</div>
           <div id="plan-items"></div>
         </div>
-      </div>
-      <!-- 연간 계획 진행률 -->
-      <div class="panel" id="plan-annual" style="margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-          <div class="ptitle" style="margin-bottom:0">연간 계획 진행률 — 2026</div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)">
-              <span style="display:inline-block;width:12px;height:5px;background:var(--amber);border-radius:2px"></span>누계 실적
-            </span>
-            <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--purple);font-weight:600">
-              <span style="display:inline-block;width:3px;height:12px;background:var(--purple);border-radius:1px"></span>목표 페이스
-            </span>
-          </div>
-        </div>
-        <div id="plan-annual-items" style="display:flex;flex-direction:column;gap:20px"></div>
       </div>
 
       <!-- 업로드 안내 (계획 없을 때) -->
