@@ -97,6 +97,7 @@ tr:last-child td{border-bottom:none}
 .accum-btn{font-size:11px;font-weight:700;padding:5px 13px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:all .2s;white-space:nowrap}
 .accum-btn:hover{border-color:var(--coral);color:var(--coral);background:var(--coral-light)}
 .accum-btn.on{background:var(--grad2);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(242,123,80,.3)}
+.mon-sep-v{width:1px;height:20px;background:var(--border2);margin:0 4px;flex-shrink:0;align-self:center}
 .nav-tabs{display:flex;gap:2px;align-items:center}
 .nav-tab{font-size:12px;font-weight:600;padding:7px 16px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .2s}
 .nav-tab:hover{background:var(--card2);color:var(--text)}
@@ -215,7 +216,9 @@ tr:last-child td{border-bottom:none}
           <div style="display:flex;justify-content:space-around;margin-top:4px" id="plan-rev-labels"></div>
         </div>
         <div class="panel">
-          <div class="ptitle">항목별 달성률 — 당월</div>
+          <div class="ptitle">채널별 달성률 — 당월</div>
+          <div id="plan-channels"></div>
+          <div class="ptitle" style="margin-top:18px">항목별 달성률 — 당월</div>
           <div id="plan-items"></div>
         </div>
       </div>
@@ -534,11 +537,10 @@ function render(){
   var monBar=document.getElementById('mon-bar');
   monBar.innerHTML='<span class="mon-lbl">월 선택:</span>'+
     MON_NM.slice(0,lmi+1).map(function(m,i){
-      return '<button class="mon-btn'+(i===smi?' on':'')+'" onclick="selectMonth('+i+')">'+m+'</button>';
+      return '<button class="mon-btn'+((!isAccum&&i===smi)?' on':'')+'" onclick="selectMonthOnly('+i+')">'+m+'</button>';
     }).join('')+
-    '<div class="mon-sep"></div>'+
-    '<button class="accum-btn'+(isAccum?' on':'')+'" onclick="toggleAccum()">'+
-      (isAccum?'📊 누계':'📊 누계')+'</button>';
+    '<div class="mon-sep-v"></div>'+
+    '<button class="accum-btn'+(isAccum?' on':'')+'" onclick="selectAccum()">1~'+MON_NM[smi]+' 누계</button>';
 
   // 단월/누계 값 계산
   // isAccum=true 이면 0~smi 합산, false이면 smi 단월
@@ -857,6 +859,8 @@ dz.addEventListener('click',function(){document.getElementById('finput').click()
 window.handleReset=handleReset;
 window.selectMonth=selectMonth;
 window.toggleAccum=toggleAccum;
+window.selectMonthOnly=selectMonthOnly;
+window.selectAccum=selectAccum;
 
 // ── 계획 데이터 파싱 ──────────────────────────────────────
 function parsePlanData(rows){
@@ -1011,16 +1015,28 @@ function renderPlan(D,PL){
   document.getElementById('plan-annual-items').innerHTML=annualItems.map(function(it){
     var r=null, rStr='', barColor='', diffStr='';
     if(it.isProfit&&it.annualPln<0){
-      // 영업손익: 누계손실 vs 연간계획손실
-      var ratio=it.annualPln!==0?Math.abs(it.accAct)/Math.abs(it.annualPln)*100:null;
-      if(ratio!==null&&it.accAct<0&&ratio>100){rStr='손실 초과';barColor='var(--red)';}
-      else if(it.accAct>=0){rStr='흑자';barColor='var(--green)';}
-      else{rStr=Math.round(ratio||0)+'%';barColor=achieveBarColor(ratio||0);}
-      var d=it.accAct-it.annualPln*(smi+1)/12;
-      diffStr=it.accAct>it.annualPln*(smi+1)/12?'▲ '+Math.abs(Math.round(it.accAct-it.annualPln*(smi+1)/12)).toLocaleString()+'M 페이스 앞섬':'▼ 연간 계획 손실 이미 초과';
-      if(ratio!==null&&ratio<=100) diffStr='▼ 목표 페이스 대비 '+Math.abs(Math.round(pacePct-(ratio||0))).toLocaleString()+'%p 부족';
-      var barW=ratio!==null?Math.min(ratio,100):0;
-      var rc=achieveColor(ratio||0);
+      // 영업손익: 목표페이스 대비 누계손실 비교
+      // 목표페이스 기준 허용 손실 = 연간계획손실 × (경과월/12)
+      var paceAllowed = it.annualPln * (smi+1)/12; // 음수
+      var ratio = it.annualPln!==0 ? Math.abs(it.accAct)/Math.abs(it.annualPln)*100 : null;
+      var barW, rc;
+      if(it.accAct >= 0){
+        rStr='흑자'; barColor='var(--green)'; barW=0;
+        rc={bg:'var(--green-light)',border:'var(--green)',text:'var(--green)'};
+        diffStr='▲ 흑자 달성 중';
+      } else if(it.accAct < paceAllowed){
+        // 누계손실이 목표페이스 허용손실보다 큼 (더 많이 손실) → 빨강
+        rStr='페이스 초과'; barColor='var(--red)';
+        barW=ratio!==null?Math.min(ratio,100):0;
+        rc={bg:'var(--red-light)',border:'var(--red)',text:'var(--red)'};
+        diffStr='▼ 목표 페이스 대비 '+Math.abs(Math.round(Math.abs(it.accAct)-Math.abs(paceAllowed))).toLocaleString()+'M 손실 초과';
+      } else {
+        // 누계손실이 목표페이스 허용손실 이내 → 초록
+        rStr=Math.round(ratio||0)+'%'; barColor='var(--green)';
+        barW=ratio!==null?Math.min(ratio,100):0;
+        rc={bg:'var(--green-light)',border:'var(--green)',text:'var(--green)'};
+        diffStr='▲ 목표 페이스 내 손실 관리 중';
+      }
       return annualRow(it.lbl,it.accAct,it.annualPln,barW,barColor,rStr,diffStr,pacePct,paceLabel,rc);
     } else {
       r=it.annualPln!==0?it.accAct/it.annualPln*100:null;
@@ -1052,6 +1068,76 @@ function renderPlan(D,PL){
       '<div style="font-size:10px;color:'+rc.text+';margin-top:4px">'+diffStr+'</div>'+
     '</div>';
   }
+
+  // ── 연말 예상치 ───────────────────────────────────────
+  var months_elapsed = smi+1;
+  var forecastItems=[
+    {lbl:'매출액',   acc:acAR,  pln:PL.revenue.reduce(function(s,v){return s+MV(v);},0)},
+    {lbl:'매출이익', acc:Array.from({length:smi+1},function(_,i){return MV(D.grossProfit[i]||0);}).reduce(function(a,b){return a+b;},0),
+                     pln:PL.grossProfit.reduce(function(s,v){return s+MV(v);},0)},
+    {lbl:'영업손익', acc:acAO,  pln:PL.opProfit.reduce(function(s,v){return s+MV(v);},0), isProfit:true},
+    {lbl:'공헌이익', acc:Array.from({length:smi+1},function(_,i){return MV(D.contribution[i]||0);}).reduce(function(a,b){return a+b;},0),
+                     pln:PL.contribution.reduce(function(s,v){return s+MV(v);},0)},
+  ];
+
+  document.getElementById('plan-forecast-items').innerHTML=forecastItems.map(function(fi){
+    var forecast=Math.round(fi.acc/months_elapsed*12);
+    var r=fi.pln!==0?forecast/fi.pln*100:null;
+    var rc=fi.isProfit&&fi.pln<0
+      ?(forecast<fi.pln?{bg:'var(--red-light)',border:'var(--red)',text:'var(--red)'}:{bg:'var(--green-light)',border:'var(--green)',text:'var(--green)'})
+      :achieveColor(r);
+    var rStr=fi.isProfit&&fi.pln<0?(forecast<fi.pln?'손실 확대 예상':'손실 축소 예상'):(r!==null?Math.round(r)+'% 달성 예상':'-');
+    return '<div style="background:var(--card2);border-radius:10px;padding:14px;border-left:3px solid '+rc.border+'">'+
+      '<div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">'+fi.lbl+'</div>'+
+      '<div style="font-size:18px;font-weight:700;color:'+rc.text+';margin-bottom:4px;letter-spacing:-.5px">'+forecast.toLocaleString()+'M</div>'+
+      '<div style="font-size:10px;color:var(--muted)">연간 계획 '+Math.round(fi.pln).toLocaleString()+'M</div>'+
+      '<div style="font-size:10px;color:'+rc.text+';font-weight:600;margin-top:4px">'+rStr+'</div>'+
+    '</div>';
+  }).join('');
+
+  // ── 채널별 달성률 ─────────────────────────────────────
+  var chKeys=[
+    {lbl:'D2C',   actK:'ch_d2c',  plnIdx:0},
+    {lbl:'B2B',   actK:'ch_b2b',  plnIdx:1},
+    {lbl:'B2C',   actK:'ch_b2c',  plnIdx:2},
+    {lbl:'Store', actK:'ch_store',plnIdx:3},
+  ];
+  // 계획 채널별 데이터 (26계획상세 row33=D2C, row34=B2B, row41=B2C, row44=Store 공급가 기준)
+  // PL.ch_plan이 없으면 전체 매출 계획으로 비율 추정
+  var chHtml='<div style="display:flex;flex-direction:column;gap:10px">';
+  chKeys.forEach(function(ch){
+    var actVal=D[ch.actK]&&D[ch.actK][smi]?MV(D[ch.actK][smi]):0;
+    // 계획 채널별: PL에 채널 계획이 없으면 표시 생략
+    var plnVal=PL['ch_'+ch.lbl.toLowerCase()]&&PL['ch_'+ch.lbl.toLowerCase()][smi]
+      ? MV(PL['ch_'+ch.lbl.toLowerCase()][smi]) : null;
+    if(plnVal===null||plnVal===0){
+      // 채널 계획 없으면 비중만 표시
+      var totalAct=chKeys.reduce(function(s,c){return s+(D[c.actK]&&D[c.actK][smi]?MV(D[c.actK][smi]):0);},0);
+      var pct=totalAct>0?Math.round(actVal/totalAct*100):0;
+      chHtml+='<div style="display:flex;align-items:center;gap:10px">'+
+        '<span style="font-size:12px;color:var(--text);width:44px;flex-shrink:0">'+ch.lbl+'</span>'+
+        '<div style="flex:1;height:6px;background:var(--bg2);border-radius:3px">'+
+          '<div style="width:'+pct+'%;height:100%;background:var(--blue);border-radius:3px"></div>'+
+        '</div>'+
+        '<span style="font-size:11px;color:var(--muted);width:120px;text-align:right">'+Math.round(actVal).toLocaleString()+'M · 비중 '+pct+'%</span>'+
+      '</div>';
+      return;
+    }
+    var r=plnVal!==0?actVal/plnVal*100:null;
+    var rc=achieveColor(r);
+    var bw=r===null?0:Math.min(r,100);
+    var d=actVal-plnVal;
+    var ds=(d>=0?'+':'')+Math.round(d).toLocaleString()+'M '+(d>=0?'초과':'미달');
+    chHtml+='<div style="display:flex;align-items:center;gap:10px">'+
+      '<span style="font-size:12px;color:var(--text);width:44px;flex-shrink:0">'+ch.lbl+'</span>'+
+      '<div style="flex:1;height:6px;background:var(--bg2);border-radius:3px">'+
+        '<div style="width:'+bw+'%;height:100%;background:'+achieveBarColor(r)+';border-radius:3px"></div>'+
+      '</div>'+
+      '<span style="font-size:11px;font-weight:700;color:'+rc.text+';width:120px;text-align:right">'+(r!==null?Math.round(r)+'%':'-')+' · '+ds+'</span>'+
+    '</div>';
+  });
+  chHtml+='</div>';
+  document.getElementById('plan-channels').innerHTML=chHtml;
 
   document.getElementById('plan-items').innerHTML='<div style="display:flex;flex-direction:column;gap:11px">'+
     items.map(function(it){
