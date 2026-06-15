@@ -186,11 +186,43 @@ tr:last-child td{border-bottom:none}
     </div>
     <div class="kpi-grid" id="kpis"></div>
     <div class="tabs">
-      <button class="tab on" data-t="trend">손익 추이</button>
+      <button class="tab on" data-t="plan">계획 대비</button>
+      <button class="tab" data-t="trend">손익 추이</button>
       <button class="tab" data-t="channel">채널별</button>
       <button class="tab" data-t="cost">비용 구조</button>
       <button class="tab" data-t="tbl">상세 테이블</button>
       <button class="tab" data-t="mgr">데이터 관리</button>
+    </div>
+
+    <!-- 계획 대비 패널 -->
+    <div id="pane-plan">
+      <!-- KPI 4개 -->
+      <div class="kpi-grid" id="plan-kpis" style="grid-template-columns:repeat(4,1fr)"></div>
+      <!-- 차트 + 달성률 -->
+      <div class="g2">
+        <div class="panel">
+          <div class="ptitle">매출액 실적 vs 계획</div>
+          <div class="legend" style="align-items:center;flex-wrap:wrap;gap:10px">
+            <span><span class="ldot" style="background:#AFA9EC"></span>계획</span>
+            <span><span class="ldot" style="background:#534AB7"></span>실적</span>
+            <span style="font-size:10px;color:var(--muted);margin-left:4px">달성률:
+              <span style="background:var(--green-light);border:1px solid var(--green);border-radius:4px;padding:1px 5px;color:var(--green);font-size:10px;font-weight:700">100%+</span>
+              <span style="background:var(--amber-light);border:1px solid var(--amber);border-radius:4px;padding:1px 5px;color:var(--amber);font-size:10px;font-weight:700;margin-left:3px">50~99%</span>
+              <span style="background:var(--red-light);border:1px solid var(--red);border-radius:4px;padding:1px 5px;color:var(--red);font-size:10px;font-weight:700;margin-left:3px">50% 미만</span>
+            </span>
+          </div>
+          <div id="plan-rev-chart" style="display:flex;gap:8px;align-items:flex-end;height:180px;border-bottom:1px solid var(--border);padding-bottom:6px;margin-top:12px;overflow:hidden"></div>
+          <div style="display:flex;justify-content:space-around;margin-top:4px" id="plan-rev-labels"></div>
+        </div>
+        <div class="panel">
+          <div class="ptitle">항목별 달성률 — 당월</div>
+          <div id="plan-items"></div>
+        </div>
+      </div>
+      <!-- 업로드 안내 (계획 없을 때) -->
+      <div id="plan-empty" class="empty" style="display:none;padding:40px">
+        📋 손익 파일을 업로드하면 계획 대비 분석이 자동으로 표시됩니다.
+      </div>
     </div>
 
     <div id="pane-trend">
@@ -304,7 +336,7 @@ const CST_NM = ['인건비','브랜드마케팅','지급수수료','기타경비
 const MON_NM = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 const COL_IDX = [3,5,7,9,11,12,13,14,15,16,17,18];
 
-let D = null, uploadLog = null;
+let D = null, uploadLog = null, _planData = null;
 let charts = {}, curTab = 'trend';
 let selectedMi = -1; // 선택된 월 인덱스 (-1이면 최근 월)
 let isAccum = false;  // 누계 모드 여부
@@ -411,7 +443,10 @@ function readXlsx(file){
         var wb=XLSX.read(e.target.result,{type:'binary'});
         var sn=wb.SheetNames.find(function(n){return n.includes('Report(1)');}) || wb.SheetNames[0];
         var rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1});
-        res(rows);
+        // 계획 시트도 파싱
+        var planSn=wb.SheetNames.find(function(n){return n.includes('계획상세');});
+        var planRows=planSn?XLSX.utils.sheet_to_json(wb.Sheets[planSn],{header:1}):null;
+        res({rows:rows, planRows:planRows});
       }catch(err){rej(err);}
     };
     rd.onerror=rej;
@@ -424,18 +459,25 @@ async function handleFile(file){
   btn.classList.add('busy');
   toast('파일 분석 중...','info');
   try{
-    var rows=await readXlsx(file);
+    var fileData=await readXlsx(file);
+    var rows=fileData.rows||fileData;
+    var planRows=fileData.planRows||null;
     var parsed=parseReport1(rows);
     var m=file.name.match(/(\d{4})[._\-]?(\d{2})/);
     var now=new Date();
     var uploadMonth=m?(m[1]+'.'+m[2]):(now.getFullYear()+'.'+String(now.getMonth()+1).padStart(2,'0'));
 
+    if(planRows){
+      _planData=parsePlanData(planRows);
+      await apiSave('__plan__', _planData);
+    }
     await apiSave('__data__', parsed);
     await apiSave('__log__', {uploadedAt: now.toISOString(), month: uploadMonth});
 
     var result=await apiGet();
     D=result.data;
     uploadLog=result.log;
+    _planData=result.plan||null;
     selectedMi=-1;
     isAccum=false;
     render();
@@ -733,6 +775,9 @@ function render(){
   }).join('')+'</tbody>';
   document.getElementById('detail-tbl').innerHTML=thead+tbody;
 
+  // 계획 대비 렌더
+  if(typeof _planData !== 'undefined') renderPlan(D, _planData);
+
   // 관리
   document.getElementById('mgr-list').innerHTML=D?
     '<div class="mrow">'+
@@ -775,7 +820,7 @@ document.querySelector('.tabs').addEventListener('click',function(e){
   var b=e.target.closest('.tab'); if(!b) return;
   var t=b.dataset.t; curTab=t;
   document.querySelectorAll('.tab').forEach(function(x){x.classList.toggle('on',x.dataset.t===t);});
-  ['trend','channel','cost','tbl','mgr'].forEach(function(x){
+  ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
     document.getElementById('pane-'+x).style.display=x===t?'block':'none';
   });
 });
@@ -803,6 +848,7 @@ window.toggleAccum=toggleAccum;
     var result=await apiGet();
     D=result.data;
     uploadLog=result.log;
+    _planData=result.plan||null;
     document.getElementById('loading').style.display='none';
     render();
   }catch(err){
