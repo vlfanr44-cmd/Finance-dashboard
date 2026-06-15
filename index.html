@@ -822,6 +822,15 @@ function toggleAccum(){
   isAccum=!isAccum;
   render();
 }
+function selectMonthOnly(mi){
+  isAccum=false;
+  selectedMi=mi;
+  render();
+}
+function selectAccum(){
+  isAccum=true;
+  render();
+}
 
 async function handleReset(){
   if(!confirm('모든 데이터를 초기화할까요?')) return;
