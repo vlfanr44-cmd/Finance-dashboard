@@ -367,7 +367,7 @@ const CST_C  = ['#2B4EBF','#F27B50','#2E7D52','#A89880','#D94F3D'];
 const CH_NM  = ['자사몰','B2B','B2C','Store','Export'];
 const CST_NM = ['인건비','브랜드마케팅','지급수수료','기타경비','감가상각'];
 const MON_NM = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-const COL_IDX = [3,5,7,9,11,12,13,14,15,16,17,18];
+const COL_IDX = [3,5,7,9,11,null,13,14,15,16,17,18]; // 1~5월, 6월없음(null), 7~12월
 
 let D = null, uploadLog = null, _planData = null;
 let charts = {}, curTab = 'trend';
@@ -417,6 +417,7 @@ async function apiClear(){
 // ── 엑셀 파싱 ────────────────────────────────────────────
 function getMonthVals(row){
   return COL_IDX.map(function(ci){
+    if(ci===null) return 0; // 6월 데이터 없음
     var v=row[ci];
     return (typeof v==='number'&&isFinite(v))?v:0;
   });
