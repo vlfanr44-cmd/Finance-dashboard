@@ -880,7 +880,25 @@ function parsePlanData(rows){
       return (typeof v==='number'&&isFinite(v))?v:0;
     });
   }
-  return {revenue:planVals(32),grossProfit:planVals(78),logistics:planVals(124),netRevenue:planVals(147),sga:planVals(170),opProfit:planVals(472),contribution:planVals(478)};
+  // 채널별: 하위 항목 합산
+  function sumRows(start,end){
+    return Array.from({length:12},function(_,i){
+      var total=0;
+      for(var r=start-1;r<end;r++){
+        var v=(rows[r]||[])[8+i];
+        if(typeof v==='number'&&isFinite(v)) total+=v;
+      }
+      return total;
+    });
+  }
+  return {
+    revenue:planVals(32),grossProfit:planVals(78),logistics:planVals(124),
+    netRevenue:planVals(147),sga:planVals(170),opProfit:planVals(472),contribution:planVals(478),
+    ch_d2c:sumRows(33,33),   // 자사몰
+    ch_b2b:sumRows(34,38),   // wellstory+starbucks+CJFW+캠퍼스+기타
+    ch_b2c:sumRows(41,47),   // HSP+Kurly+SSG+롯데+이마트+편의점+기타
+    ch_store:sumRows(50,52), // STORE1+신세계
+  };
 }
 function achieveColor(r){
   if(r===null||!isFinite(r)) return {bg:'var(--card2)',border:'var(--border)',text:'var(--muted)'};
@@ -1105,44 +1123,30 @@ function renderPlan(D,PL){
   }).join('');
 
   // ── 채널별 달성률 ─────────────────────────────────────
-  var chKeys=[
-    {lbl:'D2C',   actK:'ch_d2c',  plnIdx:0},
-    {lbl:'B2B',   actK:'ch_b2b',  plnIdx:1},
-    {lbl:'B2C',   actK:'ch_b2c',  plnIdx:2},
-    {lbl:'Store', actK:'ch_store',plnIdx:3},
+  // 채널별 달성률 - 계획 대비 실적
+  var chDefs=[
+    {lbl:'D2C',   actKey:'ch_d2c',  plnKey:'ch_d2c',  color:'#2B4EBF'},
+    {lbl:'B2B',   actKey:'ch_b2b',  plnKey:'ch_b2b',  color:'#2E7D52'},
+    {lbl:'B2C',   actKey:'ch_b2c',  plnKey:'ch_b2c',  color:'#F27B50'},
+    {lbl:'Store', actKey:'ch_store',plnKey:'ch_store', color:'#7B5EA7'},
   ];
-  // 계획 채널별 데이터 (26계획상세 row33=D2C, row34=B2B, row41=B2C, row44=Store 공급가 기준)
-  // PL.ch_plan이 없으면 전체 매출 계획으로 비율 추정
-  var chHtml='<div style="display:flex;flex-direction:column;gap:10px">';
-  chKeys.forEach(function(ch){
-    var actVal=D[ch.actK]&&D[ch.actK][smi]?MV(D[ch.actK][smi]):0;
-    // 계획 채널별: PL에 채널 계획이 없으면 표시 생략
-    var plnVal=PL['ch_'+ch.lbl.toLowerCase()]&&PL['ch_'+ch.lbl.toLowerCase()][smi]
-      ? MV(PL['ch_'+ch.lbl.toLowerCase()][smi]) : null;
-    if(plnVal===null||plnVal===0){
-      // 채널 계획 없으면 비중만 표시
-      var totalAct=chKeys.reduce(function(s,c){return s+(D[c.actK]&&D[c.actK][smi]?MV(D[c.actK][smi]):0);},0);
-      var pct=totalAct>0?Math.round(actVal/totalAct*100):0;
-      chHtml+='<div style="display:flex;align-items:center;gap:10px">'+
-        '<span style="font-size:12px;color:var(--text);width:44px;flex-shrink:0">'+ch.lbl+'</span>'+
-        '<div style="flex:1;height:6px;background:var(--bg2);border-radius:3px">'+
-          '<div style="width:'+pct+'%;height:100%;background:var(--blue);border-radius:3px"></div>'+
-        '</div>'+
-        '<span style="font-size:11px;color:var(--muted);width:120px;text-align:right">'+Math.round(actVal).toLocaleString()+'M · 비중 '+pct+'%</span>'+
-      '</div>';
-      return;
-    }
-    var r=plnVal!==0?actVal/plnVal*100:null;
+  var chHtml='<div style="display:flex;flex-direction:column;gap:11px">';
+  chDefs.forEach(function(ch){
+    var actVal=D[ch.actKey]&&D[ch.actKey][smi]?MV(D[ch.actKey][smi]):0;
+    var plnVal=PL[ch.plnKey]&&PL[ch.plnKey][smi]?PL[ch.plnKey][smi]/1e6:0;
+    var r=plnVal>0?actVal/plnVal*100:null;
     var rc=achieveColor(r);
     var bw=r===null?0:Math.min(r,100);
     var d=actVal-plnVal;
     var ds=(d>=0?'+':'')+Math.round(d).toLocaleString()+'M '+(d>=0?'초과':'미달');
     chHtml+='<div style="display:flex;align-items:center;gap:10px">'+
-      '<span style="font-size:12px;color:var(--text);width:44px;flex-shrink:0">'+ch.lbl+'</span>'+
+      '<span style="font-size:12px;color:var(--text);width:44px;flex-shrink:0;font-weight:600">'+ch.lbl+'</span>'+
       '<div style="flex:1;height:6px;background:var(--bg2);border-radius:3px">'+
-        '<div style="width:'+bw+'%;height:100%;background:'+achieveBarColor(r)+';border-radius:3px"></div>'+
+        '<div style="width:'+bw.toFixed(1)+'%;height:100%;background:'+achieveBarColor(r)+';border-radius:3px"></div>'+
       '</div>'+
-      '<span style="font-size:11px;font-weight:700;color:'+rc.text+';width:120px;text-align:right">'+(r!==null?Math.round(r)+'%':'-')+' · '+ds+'</span>'+
+      '<span style="font-size:11px;font-weight:700;color:'+rc.text+';width:140px;text-align:right">'+
+        (r!==null?Math.round(r)+'%':'-')+' · '+ds+
+      '</span>'+
     '</div>';
   });
   chHtml+='</div>';
