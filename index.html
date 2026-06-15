@@ -219,6 +219,22 @@ tr:last-child td{border-bottom:none}
           <div id="plan-items"></div>
         </div>
       </div>
+      <!-- 연간 계획 진행률 -->
+      <div class="panel" id="plan-annual" style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+          <div class="ptitle" style="margin-bottom:0">연간 계획 진행률 — 2026</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)">
+              <span style="display:inline-block;width:12px;height:5px;background:var(--amber);border-radius:2px"></span>누계 실적
+            </span>
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--purple);font-weight:600">
+              <span style="display:inline-block;width:3px;height:12px;background:var(--purple);border-radius:1px"></span>목표 페이스
+            </span>
+          </div>
+        </div>
+        <div id="plan-annual-items" style="display:flex;flex-direction:column;gap:20px"></div>
+      </div>
+
       <!-- 업로드 안내 (계획 없을 때) -->
       <div id="plan-empty" class="empty" style="display:none;padding:40px">
         📋 손익 파일을 업로드하면 계획 대비 분석이 자동으로 표시됩니다.
@@ -979,6 +995,64 @@ function renderPlan(D,PL){
     {lbl:'영업손익',act:aOP,  pln:pOP,  inv:false, isProfit:true},
     {lbl:'공헌이익',act:aCon, pln:pCon, inv:false, isProfit:false},
   ];
+  // ── 연간 계획 진행률 ──────────────────────────────────
+  var annualItems=[
+    {lbl:'매출액',   accAct:acAR, annualPln:PL.revenue.reduce(function(s,v){return s+MV(v);},0),     isProfit:false},
+    {lbl:'매출이익', accAct:Array.from({length:smi+1},function(_,i){return MV(D.grossProfit[i]||0);}).reduce(function(a,b){return a+b;},0),
+                     annualPln:PL.grossProfit.reduce(function(s,v){return s+MV(v);},0),               isProfit:false},
+    {lbl:'영업손익', accAct:acAO, annualPln:PL.opProfit.reduce(function(s,v){return s+MV(v);},0),    isProfit:true},
+    {lbl:'공헌이익', accAct:Array.from({length:smi+1},function(_,i){return MV(D.contribution[i]||0);}).reduce(function(a,b){return a+b;},0),
+                     annualPln:PL.contribution.reduce(function(s,v){return s+MV(v);},0),              isProfit:false},
+  ];
+  // 경과 월 기준 목표 페이스 (%)
+  var pacePct=Math.round((smi+1)/12*100);
+  var paceLabel='목표 페이스 '+pacePct+'%';
+
+  document.getElementById('plan-annual-items').innerHTML=annualItems.map(function(it){
+    var r=null, rStr='', barColor='', diffStr='';
+    if(it.isProfit&&it.annualPln<0){
+      // 영업손익: 누계손실 vs 연간계획손실
+      var ratio=it.annualPln!==0?Math.abs(it.accAct)/Math.abs(it.annualPln)*100:null;
+      if(ratio!==null&&it.accAct<0&&ratio>100){rStr='손실 초과';barColor='var(--red)';}
+      else if(it.accAct>=0){rStr='흑자';barColor='var(--green)';}
+      else{rStr=Math.round(ratio||0)+'%';barColor=achieveBarColor(ratio||0);}
+      var d=it.accAct-it.annualPln*(smi+1)/12;
+      diffStr=it.accAct>it.annualPln*(smi+1)/12?'▲ '+Math.abs(Math.round(it.accAct-it.annualPln*(smi+1)/12)).toLocaleString()+'M 페이스 앞섬':'▼ 연간 계획 손실 이미 초과';
+      if(ratio!==null&&ratio<=100) diffStr='▼ 목표 페이스 대비 '+Math.abs(Math.round(pacePct-(ratio||0))).toLocaleString()+'%p 부족';
+      var barW=ratio!==null?Math.min(ratio,100):0;
+      var rc=achieveColor(ratio||0);
+      return annualRow(it.lbl,it.accAct,it.annualPln,barW,barColor,rStr,diffStr,pacePct,paceLabel,rc);
+    } else {
+      r=it.annualPln!==0?it.accAct/it.annualPln*100:null;
+      rStr=r!==null?Math.round(r)+'%':'-';
+      barColor=achieveBarColor(r);
+      var gap=r!==null?Math.round(pacePct-r):null;
+      diffStr=gap===null?'-':gap>0?'▼ 목표 페이스 대비 '+gap+'%p 부족':'▲ 목표 페이스 '+Math.abs(gap)+'%p 앞섬';
+      var barW2=r!==null?Math.min(r,100):0;
+      var rc2=achieveColor(r);
+      return annualRow(it.lbl,it.accAct,it.annualPln,barW2,barColor,rStr,diffStr,pacePct,paceLabel,rc2);
+    }
+  }).join('');
+
+  function annualRow(lbl,accAct,annualPln,barW,barColor,rStr,diffStr,pacePct,paceLabel,rc){
+    return '<div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
+        '<span style="font-size:12px;color:var(--text);font-weight:600">'+lbl+'</span>'+
+        '<div style="display:flex;align-items:center;gap:12px">'+
+          '<span style="font-size:11px;color:var(--muted)">누계 '+Math.round(accAct).toLocaleString()+'M / 연간 '+Math.round(annualPln).toLocaleString()+'M</span>'+
+          '<span style="font-size:13px;font-weight:600;color:'+rc.text+';min-width:60px;text-align:right">'+rStr+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div style="position:relative;height:28px">'+
+        '<div style="position:absolute;left:'+pacePct+'%;top:0;transform:translateX(-50%);font-size:9px;font-weight:700;color:var(--purple);white-space:nowrap;background:#EEEDFE;padding:1px 6px;border-radius:3px">'+paceLabel+'</div>'+
+        '<div style="position:absolute;top:14px;left:0;right:0;height:10px;background:var(--bg2);border-radius:5px"></div>'+
+        '<div style="position:absolute;top:14px;left:0;width:'+barW+'%;height:10px;background:'+barColor+';border-radius:5px"></div>'+
+        '<div style="position:absolute;left:'+pacePct+'%;top:10px;width:3px;height:18px;background:var(--purple);border-radius:2px"></div>'+
+      '</div>'+
+      '<div style="font-size:10px;color:'+rc.text+';margin-top:4px">'+diffStr+'</div>'+
+    '</div>';
+  }
+
   document.getElementById('plan-items').innerHTML='<div style="display:flex;flex-direction:column;gap:11px">'+
     items.map(function(it){
       var r3=null;
