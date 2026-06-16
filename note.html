@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>경영 노트</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F7F4EF;--bg2:#F0EBE1;--white:#FFFFFF;--card:#FFFDF9;--card2:#F5F0E8;
+  --border:#E8E0D0;--border2:#D9CFC0;
+  --text:#1A1A2E;--muted:#7A7080;--faint:#C4BBAC;
+  --blue:#2B4EBF;--blue-light:#EEF2FF;--purple:#7B5EA7;
+  --coral:#F27B50;--coral-light:#FEF0EB;
+  --green:#2E7D52;--green-light:#EDFAF3;
+  --red:#D94F3D;--red-light:#FEF0EE;
+  --amber:#D97B2E;--amber-light:#FEF5EB;
+  --grad:linear-gradient(135deg,#2B4EBF 0%,#7B5EA7 100%);
+  --grad2:linear-gradient(135deg,#F27B50 0%,#E05580 100%);
+  --shadow:0 2px 8px rgba(43,78,191,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 16px rgba(43,78,191,.10);
+  --shadow-lg:0 8px 32px rgba(43,78,191,.14);
+}
+body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:13px;-webkit-font-smoothing:antialiased}
+.topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow)}
+.logo{font-size:16px;font-weight:800;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.nav-tabs{display:flex;gap:2px;align-items:center}
+.nav-tab{font-size:12px;font-weight:600;padding:7px 16px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .2s}
+.nav-tab:hover{background:var(--card2);color:var(--text)}
+.nav-tab.active{background:var(--grad);color:#fff;box-shadow:0 2px 8px rgba(43,78,191,.25)}
+.topbar-r{display:flex;align-items:center;gap:10px}
+.badge{font-size:11px;color:var(--muted);background:var(--card2);padding:4px 12px;border-radius:20px;border:1px solid var(--border);font-weight:500}
+.wrap{max-width:900px;margin:0 auto;padding:24px 24px 60px}
+.mon-bar{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:20px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow)}
+.mon-lbl{font-size:11px;color:var(--muted);font-weight:700;margin-right:6px;white-space:nowrap;letter-spacing:.4px}
+.mon-btn{font-size:11px;font-weight:600;padding:5px 13px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;transition:all .2s}
+.mon-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+.mon-btn.on{background:var(--grad);color:#fff;border-color:transparent;font-weight:700;box-shadow:0 2px 8px rgba(43,78,191,.3)}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:var(--shadow)}
+.panel-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.panel-title span{font-size:16px}
+textarea{width:100%;min-height:140px;padding:14px;border:1px solid var(--border);border-radius:10px;font-size:13px;font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);color:var(--text);resize:vertical;outline:none;line-height:1.7;transition:border .2s}
+textarea:focus{border-color:var(--blue);background:var(--white)}
+textarea::placeholder{color:var(--faint)}
+.save-bar{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+.save-hint{font-size:11px;color:var(--faint)}
+.save-btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:10px 24px;border-radius:10px;border:none;background:var(--grad);cursor:pointer;color:#fff;transition:all .2s;box-shadow:0 2px 8px rgba(43,78,191,.25)}
+.save-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.save-btn:disabled{opacity:.5;pointer-events:none;transform:none}
+.toast{position:fixed;top:68px;right:18px;z-index:999;font-size:12px;font-weight:700;padding:10px 18px;border-radius:12px;opacity:0;transition:opacity .25s;pointer-events:none;box-shadow:var(--shadow-md)}
+.toast.show{opacity:1}
+.toast.ok{background:var(--green-light);color:#1a5c3a;border:1px solid #A8ECC8}
+.toast.err{background:var(--red-light);color:#a12d20;border:1px solid #F5C6C2}
+.toast.info{background:var(--white);color:var(--text);border:1px solid var(--border)}
+.lock-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center}
+.lock-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:40px 36px;width:360px;text-align:center;box-shadow:var(--shadow-lg)}
+.lock-logo{font-size:18px;font-weight:800;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px}
+.lock-sub{font-size:12px;color:var(--muted);margin-bottom:28px}
+.lock-input{width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;background:var(--card);color:var(--text);outline:none;letter-spacing:.1em;margin-bottom:12px;transition:border .2s}
+.lock-input:focus{border-color:var(--blue)}
+.lock-btn{width:100%;padding:11px;border:none;border-radius:10px;background:var(--grad);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
+.lock-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg)}
+.lock-err{font-size:12px;color:var(--red);margin-top:8px;min-height:16px}
+.empty{text-align:center;padding:48px;color:var(--faint);font-size:13px}
+@media(max-width:768px){.nav-tabs{display:none}}
+</style>
+</head>
+<body>
+
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-logo">Medisola Finance</div>
+    <div class="lock-sub">접근하려면 비밀번호를 입력하세요</div>
+    <input class="lock-input" type="password" id="pwInput" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')checkPw()">
+    <button class="lock-btn" onclick="checkPw()">확인</button>
+    <div class="lock-err" id="pwErr"></div>
+  </div>
+</div>
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:20px">
+    <div class="logo">Medisola Finance</div>
+    <nav class="nav-tabs">
+      <a class="nav-tab" href="summary.html">📋 경영 요약</a>
+      <a class="nav-tab" href="index.html">📊 손익</a>
+      <a class="nav-tab" href="balance.html">🏦 재무상태표</a>
+      <a class="nav-tab" href="cashflow.html">💧 현금흐름표</a>
+      <a class="nav-tab active" href="note.html">📝 경영 노트</a>
+      <a class="nav-tab" href="card.html">💳 법인카드</a>
+    </nav>
+  </div>
+  <div class="topbar-r">
+    <span class="badge" id="pbadge">월 선택</span>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="wrap">
+  <div id="loading" class="empty" style="padding:60px">데이터를 불러오는 중...</div>
+  <div id="main" style="display:none">
+
+    <div class="mon-bar" id="mon-bar"><span class="mon-lbl">월 선택:</span></div>
+
+    <!-- X월 경과 -->
+    <div class="panel">
+      <div class="panel-title"><span>📌</span><span id="title-past"></span></div>
+      <textarea id="txt-past" placeholder="이번 달 주요 진행사항을 입력하세요&#10;&#10;예) · 신규 거래처 A사 계약 완료&#10;    · B 캠페인 런칭 및 초기 반응 양호&#10;    · 조직 개편 완료"></textarea>
+    </div>
+
+    <!-- X월 계획 -->
+    <div class="panel">
+      <div class="panel-title"><span>🗓️</span><span id="title-next"></span></div>
+      <textarea id="txt-next" placeholder="익월 주요 예정사항을 입력하세요&#10;&#10;예) · C사 미팅 및 제안서 발송 예정&#10;    · 여름 시즌 프로모션 기획 착수&#10;    · 신규 채용 면접 진행"></textarea>
+    </div>
+
+    <div class="save-bar">
+      <div class="save-hint" id="save-hint"></div>
+      <button class="save-btn" id="save-btn" onclick="saveNote()">💾 저장</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbxft4SwgXRNwuSSD04Oeb8cn8WRoZo_eFq-8CnvoHbK01QZ-LbstqUYX0K3oc2BoPg/exec';
+const MON_NM = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+let selMi = new Date().getMonth(); // 현재 월 기본 선택
+let noteData = {}; // {YYYYMM: {past, next, savedAt}}
+
+function toast(msg, type='ok'){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + type;
+  clearTimeout(t._t); t._t = setTimeout(()=>t.className='toast', 3500);
+}
+
+// 잠금
+(function(){
+  const PW='medi001!!', SK='medi_auth';
+  if(sessionStorage.getItem(SK)==='ok') document.getElementById('lockScreen').style.display='none';
+  window.checkPw = function(){
+    const v = document.getElementById('pwInput').value;
+    if(v===PW){ sessionStorage.setItem(SK,'ok'); document.getElementById('lockScreen').style.display='none'; }
+    else{ document.getElementById('pwErr').textContent='비밀번호가 올바르지 않습니다.'; document.getElementById('pwInput').value=''; }
+  };
+})();
+
+async function apiGet(){
+  const r = await fetch(API+'?action=get');
+  const j = await r.json();
+  if(!j.ok) throw new Error(j.error);
+  return j;
+}
+async function apiSave(key, value){
+  const r = await fetch(API, {method:'POST', body:JSON.stringify({action:'save', key, value})});
+  const j = await r.json();
+  if(!j.ok) throw new Error(j.error);
+}
+
+function getYYYYMM(mi){
+  return '2026' + String(mi+1).padStart(2,'0');
+}
+
+function render(){
+  // 월 선택 바
+  document.getElementById('mon-bar').innerHTML =
+    '<span class="mon-lbl">월 선택:</span>' +
+    MON_NM.slice(0,12).map((m,i) =>
+      `<button class="mon-btn${i===selMi?' on':''}" onclick="selectMonth(${i})">${m}</button>`
+    ).join('');
+
+  const yyyymm = getYYYYMM(selMi);
+  const data = noteData[yyyymm] || {past:'', next:''};
+
+  // 제목 업데이트
+  document.getElementById('title-past').textContent = MON_NM[selMi] + ' 경과';
+  document.getElementById('title-next').textContent = MON_NM[selMi+1] ? MON_NM[selMi+1] + ' 계획' : '익월 계획';
+
+  // 텍스트 로드
+  document.getElementById('txt-past').value = data.past || '';
+  document.getElementById('txt-next').value = data.next || '';
+
+  // 저장 시각
+  const hint = data.savedAt
+    ? '마지막 저장: ' + new Date(data.savedAt).toLocaleString('ko-KR')
+    : '아직 저장된 내용이 없어요';
+  document.getElementById('save-hint').textContent = hint;
+
+  document.getElementById('pbadge').textContent = MON_NM[selMi];
+}
+
+async function saveNote(){
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  toast('저장 중...', 'info');
+  try{
+    const yyyymm = getYYYYMM(selMi);
+    const value = {
+      past: document.getElementById('txt-past').value,
+      next: document.getElementById('txt-next').value,
+      savedAt: new Date().toISOString(),
+    };
+    await apiSave('__note_' + yyyymm + '__', value);
+    noteData[yyyymm] = value;
+    document.getElementById('save-hint').textContent = '마지막 저장: ' + new Date().toLocaleString('ko-KR');
+    toast(MON_NM[selMi] + ' 경영 노트 저장 완료 ✓');
+  }catch(err){
+    toast('저장 실패: ' + err.message, 'err');
+  }
+  btn.disabled = false;
+}
+
+function selectMonth(mi){
+  selMi = mi;
+  render();
+}
+window.selectMonth = selectMonth;
+
+// 초기 로드
+(async()=>{
+  try{
+    const result = await apiGet();
+    // note 데이터 수집
+    if(result.notes) noteData = result.notes;
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+    render();
+  }catch(err){
+    document.getElementById('loading').innerHTML =
+      `<div style="color:var(--red);text-align:center;padding:40px">⚠️ 서버 연결 실패<br><small style="color:var(--muted)">${err.message}</small></div>`;
+  }
+})();
+</script>
+</body>
+</html>
