@@ -350,7 +350,7 @@ function render(PL, BS, CF){
   // ── 월 선택 바 ──────────────────────────────────────
   // CF 기준 월 목록 (연도 없는 첫 항목 제외)
   // CF months: [".12", "25.01", ..., "26.04"] → 연도 있는 것만 사용
-  const validMonths = [];
+  validMonths = [];
   if(CF){
     CF.months.forEach((m,i)=>{
       const yr = CF.yearLabels[i];
@@ -947,6 +947,7 @@ window.selectMonth = selectMonth;
 // ── 초기 로드 ─────────────────────────────────────────────
 let _PL=null, _BS=null, _CF=null;
 let _aiSummaryData = {};
+let validMonths = [];
 
 // ── AI 경영 요약 생성 ──────────────────────────────────────
 async function generateAISummary(){
@@ -1045,8 +1046,9 @@ async function saveAISummary(){
 }
 
 function loadAISummary(){
+  // validMonths가 render 안에서 정의되므로 안전하게 처리
+  if(typeof validMonths === 'undefined' || !validMonths || !validMonths[selectedMi]) return;
   const selVM = validMonths[selectedMi];
-  if(!selVM) return;
   const yyyymm = selVM.year + selVM.month.split('.')[1].padStart(2,'0');
   const d = _aiSummaryData[yyyymm] || {};
   document.getElementById('ai-summary-text').value = d.text || '';
