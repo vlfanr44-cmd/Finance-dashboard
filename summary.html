@@ -318,6 +318,20 @@ async function apiGet(){
   const r=await fetch(API+'?action=get'); const j=await r.json();
   if(!j.ok) throw new Error(j.error); return j;
 }
+async function apiSave(key,value){
+  const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key,value})});
+  const j=await r.json(); if(!j.ok) throw new Error(j.error);
+}
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast')||document.createElement('div');
+  if(!document.getElementById('toast')){t.id='toast';t.style.cssText='position:fixed;top:68px;right:18px;z-index:999;font-size:12px;font-weight:700;padding:10px 18px;border-radius:12px;opacity:0;transition:opacity .25s;pointer-events:none;';document.body.appendChild(t);}
+  t.textContent=msg;
+  t.style.background=type==='ok'?'var(--green-light)':type==='err'?'var(--red-light)':'var(--white)';
+  t.style.color=type==='ok'?'#1a5c3a':type==='err'?'#a12d20':'var(--text)';
+  t.style.border=type==='ok'?'1px solid #A8ECC8':type==='err'?'1px solid #F5C6C2':'1px solid var(--border)';
+  t.style.opacity='1';
+  clearTimeout(t._t); t._t=setTimeout(()=>t.style.opacity='0',3500);
+}
 
 // ── 차트 ──────────────────────────────────────────────────
 function mkChart(id,cfg){
