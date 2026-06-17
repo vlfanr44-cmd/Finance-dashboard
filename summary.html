@@ -263,12 +263,6 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
   }
   .insight-card { padding: 10px !important; box-shadow: none !important; border: 1px solid #ddd !important; }
 
-  /* 차트 - section-title과 함께 새 페이지에서 시작 */
-  .section-title:has(+ .g2),
-  .section-title:has(+ .g2) + .g2 {
-    page-break-before: always !important;
-    break-before: page !important;
-  }
   .g2 {
     grid-template-columns: 1fr 1fr !important;
     gap: 8px !important;
@@ -397,6 +391,7 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
     <div class="insights" id="insights"></div>
 
     <!-- 추이 차트 -->
+    <div style="page-break-before:always;break-before:page">
     <div class="section-title">핵심 지표 추이</div>
     <div class="g2">
       <div class="panel">
@@ -414,6 +409,7 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
         </div>
         <div style="position:relative;height:220px"><canvas id="c-cash" role="img" aria-label="현금잔액 추이">현금잔액</canvas></div>
       </div>
+    </div>
     </div>
 
   </div>
