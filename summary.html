@@ -996,16 +996,6 @@ function render(PL, BS, CF){
 
 function selectMonth(mi){ selectedMi=mi; render(_PL, _BS, _CF); }
 
-  };
-
-  try {
-    await html2pdf().set(opt).from(el).save();
-  } catch(e) {
-    alert('PDF 생성 실패: ' + e.message);
-  }
-
-  btn.textContent = '📥 PDF 저장'; btn.disabled = false;
-}
 window.selectMonth = selectMonth;
 
 // ── 초기 로드 ─────────────────────────────────────────────
