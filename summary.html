@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>경영 요약 대시보드</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -227,7 +226,7 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
       <a class="nav-tab" href="card.html">💳 법인카드</a>
     </nav>
   </div>
-  <div class="topbar-r">      <button class="print-btn" onclick="downloadPDF()" id="pdf-btn" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">📥 PDF 저장</button>
+  <div class="topbar-r">      <button class="print-btn" onclick="doPrint()" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">🖨️ 인쇄 / PDF</button>
     <span class="badge" id="pbadge">데이터 로딩 중</span>
   </div>
 </div>
@@ -997,21 +996,6 @@ function render(PL, BS, CF){
 
 function selectMonth(mi){ selectedMi=mi; render(_PL, _BS, _CF); }
 
-async function downloadPDF(){
-  const btn = document.getElementById('pdf-btn');
-  btn.textContent = '⏳ 생성 중...'; btn.disabled = true;
-
-  const el = document.getElementById('main');
-  const selVM = validMonths[selectedMi];
-  const fname = selVM ? `Medisola_경영요약_${selVM.year}${selVM.month.replace('.','')}.pdf` : 'Medisola_경영요약.pdf';
-
-  const opt = {
-    margin: [8, 8, 8, 8],
-    filename: fname,
-    image: { type: 'jpeg', quality: 0.97 },
-    html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1400 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
   };
 
   try {
@@ -1148,6 +1132,19 @@ window.saveAISummary = saveAISummary;
       </div>`;
   }
 })();
+
+// 인쇄/PDF 안내
+function doPrint(){
+  const ok = confirm(
+    '📄 인쇄 / PDF 저장 안내\n\n' +
+    '① 아래 인쇄 창에서 [프린터] 항목을 클릭하세요.\n' +
+    '② "PDF로 저장" 또는 "Microsoft Print to PDF"를 선택하세요.\n' +
+    '③ [저장] 버튼을 누르면 PDF 파일로 다운로드됩니다.\n\n' +
+    '※ 실제 프린터로 출력하려면 해당 프린터를 선택하세요.\n\n' +
+    '[확인]을 누르면 인쇄 창이 열립니다.'
+  );
+  if(ok) window.print();
+}
 </script>
 </body>
 </html>
