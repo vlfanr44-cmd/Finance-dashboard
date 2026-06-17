@@ -164,41 +164,129 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 }
 
 @media print {
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  body { background: #fff !important; font-size: 11px !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+  body { background: #fff !important; font-size: 10px !important; margin: 0 !important; }
 
   /* 숨길 요소 */
   .topbar, .mon-bar, .tabs, .upbtn, .print-btn,
   .lock-screen, .toast, .save-btn, .accum-btn,
-  #memo-save-btn, #ai-save-btn, #ai-gen-btn { display: none !important; }
+  #memo-save-btn, #ai-save-btn, #ai-gen-btn,
+  #ai-summary-saved-at { display: none !important; }
 
   /* 레이아웃 */
-  .wrap { max-width: 100% !important; padding: 8px 12px !important; }
+  .wrap { max-width: 100% !important; padding: 4px 8px !important; margin: 0 !important; }
 
-  /* 섹션 전체를 한 블록으로 묶어 잘림 방지 */
-  .section-title { break-after: avoid !important; page-break-after: avoid !important; }
+  /* 섹션 제목 잘림 방지 */
+  .section-title {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+    font-size: 9px !important;
+    margin-bottom: 6px !important;
+  }
+  .section-title + * {
+    break-before: avoid !important;
+    page-break-before: avoid !important;
+  }
 
-  /* 각 섹션 그룹이 페이지 중간에 잘리지 않도록 */
-  .section-title + * { break-before: avoid !important; page-break-before: avoid !important; }
-
-  /* 카드/패널 */
-  .kpi-grid, .yoy-grid, .ch-grid, .turnover-grid,
-  .insights, .g2, .panel, .runway-card, .alert-box {
+  /* KPI 그리드 - 한 줄 유지 */
+  .kpi-grid {
+    grid-template-columns: repeat(4,1fr) !important;
+    gap: 6px !important;
+    margin-bottom: 10px !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
-
-  .kpi-card, .yoy-card, .ch-card, .turnover-card, .insight-card {
+  .kpi-card {
+    padding: 10px !important;
     box-shadow: none !important;
     border: 1px solid #ddd !important;
     break-inside: avoid !important;
   }
+  .kpi-val { font-size: 18px !important; }
 
-  /* 차트 패널은 페이지 시작에서 새로 */
-  .g2 { break-inside: avoid !important; page-break-inside: avoid !important; }
-  canvas { max-height: 180px !important; }
+  /* 런웨이 */
+  .runway-card {
+    padding: 12px !important;
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .runway-months { font-size: 32px !important; }
 
-  @page { margin: 12mm 10mm; size: A4 landscape; }
+  /* YoY */
+  .yoy-grid {
+    grid-template-columns: repeat(4,1fr) !important;
+    gap: 6px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .yoy-card { padding: 10px !important; box-shadow: none !important; border: 1px solid #ddd !important; }
+  .yoy-val { font-size: 14px !important; }
+
+  /* 채널별 */
+  .ch-grid {
+    grid-template-columns: repeat(5,1fr) !important;
+    gap: 5px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .ch-card { padding: 8px !important; box-shadow: none !important; border: 1px solid #ddd !important; }
+  .ch-val { font-size: 13px !important; }
+
+  /* 비용 경보 */
+  .alert-box {
+    padding: 10px 14px !important;
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .alert-item { padding: 6px 0 !important; }
+
+  /* 운전자본 */
+  .turnover-grid {
+    grid-template-columns: repeat(3,1fr) !important;
+    gap: 6px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .turnover-card { padding: 10px !important; box-shadow: none !important; border: 1px solid #ddd !important; }
+  .turnover-val { font-size: 22px !important; }
+
+  /* 주목할 점 */
+  .insights {
+    grid-template-columns: repeat(3,1fr) !important;
+    gap: 6px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .insight-card { padding: 10px !important; box-shadow: none !important; border: 1px solid #ddd !important; }
+
+  /* 차트 - 페이지 나누기 전에 시작 */
+  .g2 {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    page-break-before: always !important;
+  }
+  .panel {
+    padding: 12px !important;
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+  canvas { max-height: 160px !important; }
+
+  /* 경영 요약 textarea */
+  textarea {
+    border: 1px solid #ddd !important;
+    background: #fafafa !important;
+    font-size: 12px !important;
+    min-height: 60px !important;
+  }
+
+  @page { margin: 10mm 8mm; size: A4 landscape; }
 }
 </style>
 </head>
@@ -1125,15 +1213,7 @@ window.saveAISummary = saveAISummary;
 
 // 인쇄/PDF 안내
 function doPrint(){
-  const ok = confirm(
-    '📄 인쇄 / PDF 저장 안내\n\n' +
-    '① 아래 인쇄 창에서 [프린터] 항목을 클릭하세요.\n' +
-    '② "PDF로 저장" 또는 "Microsoft Print to PDF"를 선택하세요.\n' +
-    '③ [저장] 버튼을 누르면 PDF 파일로 다운로드됩니다.\n\n' +
-    '※ 실제 프린터로 출력하려면 해당 프린터를 선택하세요.\n\n' +
-    '[확인]을 누르면 인쇄 창이 열립니다.'
-  );
-  if(ok) window.print();
+  window.print();
 }
 </script>
 </body>
