@@ -263,13 +263,17 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
   }
   .insight-card { padding: 10px !important; box-shadow: none !important; border: 1px solid #ddd !important; }
 
-  /* 차트 - 페이지 나누기 전에 시작 */
+  /* 차트 - section-title과 함께 새 페이지에서 시작 */
+  .section-title:has(+ .g2),
+  .section-title:has(+ .g2) + .g2 {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
   .g2 {
     grid-template-columns: 1fr 1fr !important;
     gap: 8px !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    page-break-before: always !important;
   }
   .panel {
     padding: 12px !important;
