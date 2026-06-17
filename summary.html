@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>경영 요약 대시보드</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -162,6 +163,39 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
   .insights{grid-template-columns:1fr}
   .nav-tabs{display:none}
 }
+
+@media print {
+  /* 기본 설정 */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  body { background: #fff !important; font-size: 11px !important; }
+  
+  /* 숨길 요소 */
+  .topbar, .mon-bar, .tabs, .upbtn, .print-btn,
+  .lock-screen, .toast, .save-btn, .accum-btn,
+  #memo-save-btn, #ai-save-btn, #ai-gen-btn,
+  button[onclick="saveMemo()"], button[onclick="saveNote()"] { display: none !important; }
+  
+  /* 레이아웃 */
+  .wrap { max-width: 100% !important; padding: 10px !important; }
+  .g2 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .kpi-grid { grid-template-columns: repeat(4,1fr) !important; gap: 8px !important; }
+  .g3 { grid-template-columns: repeat(3,1fr) !important; gap: 8px !important; }
+  
+  /* 카드/패널 */
+  .panel, .kpi, .kpi-card, .runway-card, .turnover-card,
+  .yoy-card, .ch-card, .alert-box, .insight-card {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid !important;
+  }
+  
+  /* 페이지 나누기 방지 */
+  .section-title { break-after: avoid !important; }
+  canvas { max-height: 200px !important; }
+  
+  /* 페이지 여백 */
+  @page { margin: 15mm 10mm; size: A4 landscape; }
+}
 </style>
 </head>
 <body>
@@ -188,7 +222,7 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
       <a class="nav-tab" href="card.html">💳 법인카드</a>
     </nav>
   </div>
-  <div class="topbar-r">
+  <div class="topbar-r">      <button class="print-btn" onclick="downloadPDF()" id="pdf-btn" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">📥 PDF 저장</button>
     <span class="badge" id="pbadge">데이터 로딩 중</span>
   </div>
 </div>
@@ -957,6 +991,31 @@ function render(PL, BS, CF){
 }
 
 function selectMonth(mi){ selectedMi=mi; render(_PL, _BS, _CF); }
+
+async function downloadPDF(){
+  const btn = document.getElementById('pdf-btn');
+  btn.textContent = '⏳ 생성 중...'; btn.disabled = true;
+
+  const el = document.getElementById('main');
+  const selVM = validMonths[selectedMi];
+  const fname = selVM ? `Medisola_경영요약_${selVM.year}${selVM.month.replace('.','')}.pdf` : 'Medisola_경영요약.pdf';
+
+  const opt = {
+    margin: [8, 8, 8, 8],
+    filename: fname,
+    image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+  };
+
+  try {
+    await html2pdf().set(opt).from(el).save();
+  } catch(e) {
+    alert('PDF 생성 실패: ' + e.message);
+  }
+
+  btn.textContent = '📥 PDF 저장'; btn.disabled = false;
+}
 window.selectMonth = selectMonth;
 
 // ── 초기 로드 ─────────────────────────────────────────────
