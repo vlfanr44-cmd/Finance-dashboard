@@ -165,36 +165,41 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 }
 
 @media print {
-  /* 기본 설정 */
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body { background: #fff !important; font-size: 11px !important; }
-  
+
   /* 숨길 요소 */
   .topbar, .mon-bar, .tabs, .upbtn, .print-btn,
   .lock-screen, .toast, .save-btn, .accum-btn,
-  #memo-save-btn, #ai-save-btn, #ai-gen-btn,
-  button[onclick="saveMemo()"], button[onclick="saveNote()"] { display: none !important; }
-  
+  #memo-save-btn, #ai-save-btn, #ai-gen-btn { display: none !important; }
+
   /* 레이아웃 */
-  .wrap { max-width: 100% !important; padding: 10px !important; }
-  .g2 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
-  .kpi-grid { grid-template-columns: repeat(4,1fr) !important; gap: 8px !important; }
-  .g3 { grid-template-columns: repeat(3,1fr) !important; gap: 8px !important; }
-  
+  .wrap { max-width: 100% !important; padding: 8px 12px !important; }
+
+  /* 섹션 전체를 한 블록으로 묶어 잘림 방지 */
+  .section-title { break-after: avoid !important; page-break-after: avoid !important; }
+
+  /* 각 섹션 그룹이 페이지 중간에 잘리지 않도록 */
+  .section-title + * { break-before: avoid !important; page-break-before: avoid !important; }
+
   /* 카드/패널 */
-  .panel, .kpi, .kpi-card, .runway-card, .turnover-card,
-  .yoy-card, .ch-card, .alert-box, .insight-card {
+  .kpi-grid, .yoy-grid, .ch-grid, .turnover-grid,
+  .insights, .g2, .panel, .runway-card, .alert-box {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .kpi-card, .yoy-card, .ch-card, .turnover-card, .insight-card {
     box-shadow: none !important;
     border: 1px solid #ddd !important;
     break-inside: avoid !important;
   }
-  
-  /* 페이지 나누기 방지 */
-  .section-title { break-after: avoid !important; }
-  canvas { max-height: 200px !important; }
-  
-  /* 페이지 여백 */
-  @page { margin: 15mm 10mm; size: A4 landscape; }
+
+  /* 차트 패널은 페이지 시작에서 새로 */
+  .g2 { break-inside: avoid !important; page-break-inside: avoid !important; }
+  canvas { max-height: 180px !important; }
+
+  @page { margin: 12mm 10mm; size: A4 landscape; }
 }
 </style>
 </head>
@@ -1003,9 +1008,10 @@ async function downloadPDF(){
   const opt = {
     margin: [8, 8, 8, 8],
     filename: fname,
-    image: { type: 'jpeg', quality: 0.95 },
-    html2canvas: { scale: 2, useCORS: true, logging: false },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    image: { type: 'jpeg', quality: 0.97 },
+    html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1400 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
   };
 
   try {
