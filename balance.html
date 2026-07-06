@@ -441,7 +441,7 @@ tr:hover td{background:var(--blue-light)}
 </div>
 
 <script>
-const API = 'https://script.google.com/macros/s/AKfycbwOKKtk2UCpXbGICB8VKl0akryJ5jzhEHeeSRHeJCpZrgBWEqnYRoZiw8qRr1ulin3I/exec';
+const API = 'https://script.google.com/macros/s/AKfycbyYTC9X7NHAzWxyALB7oFBy0IVpDq7LN5SqI4Eew244FhAK_tbcJpW-QnfN9bOQWIHl/exec';
 
 let allData = []; // [{period, label, data}]
 let charts = {}, curTab = 'overview';
@@ -469,7 +469,8 @@ async function apiGet(){
   return j;
 }
 async function apiSave(key,value){
-  const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key,value})});
+  const encoded = encodeURIComponent(JSON.stringify(value));
+  const r=await fetch(API+'?action=save&key='+encodeURIComponent(key)+'&value='+encoded);
   const j=await r.json(); if(!j.ok) throw new Error(j.error);
 }
 async function apiClear(){
