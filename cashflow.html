@@ -370,7 +370,7 @@ tr:last-child td{border-bottom:none}
 </div>
 
 <script>
-const API = 'https://script.google.com/macros/s/AKfycbwOKKtk2UCpXbGICB8VKl0akryJ5jzhEHeeSRHeJCpZrgBWEqnYRoZiw8qRr1ulin3I/exec';
+const API = 'https://script.google.com/macros/s/AKfycbyYTC9X7NHAzWxyALB7oFBy0IVpDq7LN5SqI4Eew244FhAK_tbcJpW-QnfN9bOQWIHl/exec';
 const PIE_C = ['#2B4EBF','#F27B50','#7B5EA7','#2E7D52','#D94F3D','#A89880'];
 const SGA1_NM = ['인건비','판매수수료','브랜드마케팅','물류비','매장운영비','일반경비'];
 
@@ -407,7 +407,8 @@ async function apiGet(){
   if(!j.ok) throw new Error(j.error); return j;
 }
 async function apiSave(key,value){
-  const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'save',key,value})});
+  const encoded = encodeURIComponent(JSON.stringify(value));
+  const r=await fetch(API+'?action=save&key='+encodeURIComponent(key)+'&value='+encoded);
   const j=await r.json(); if(!j.ok) throw new Error(j.error);
 }
 
