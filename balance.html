@@ -469,9 +469,13 @@ async function apiGet(){
   return j;
 }
 async function apiSave(key,value){
-  const encoded = encodeURIComponent(JSON.stringify(value));
-  const r=await fetch(API+'?action=save&key='+encodeURIComponent(key)+'&value='+encoded);
-  const j=await r.json(); if(!j.ok) throw new Error(j.error);
+  // no-cors: CORS 우회, 응답 확인 불가하지만 저장은 됨
+  await fetch(API, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: {'Content-Type': 'text/plain'},
+    body: JSON.stringify({action:'save', key, value})
+  });
 }
 async function apiClear(){
   const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'clear'})});
