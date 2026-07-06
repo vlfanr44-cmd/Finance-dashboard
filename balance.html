@@ -107,6 +107,148 @@ tr:hover td{background:var(--blue-light)}
 .lock-btn{width:100%;padding:11px;border:none;border-radius:10px;background:var(--grad);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;box-shadow:0 2px 8px rgba(43,78,191,.25)}
 .lock-btn:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(43,78,191,.35)}
 .lock-err{font-size:12px;color:var(--red);margin-top:8px;min-height:16px}
+
+@media print {
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+  body { background: #fff !important; font-size: 10px !important; margin: 0 !important; }
+
+  /* 숨길 요소 */
+  .topbar, .mon-bar, .tabs, .upbtn, .print-btn,
+  .lock-screen, .toast, .save-btn, .accum-btn,
+  #memo-save-btn, #ai-save-btn, #ai-gen-btn,
+  #ai-summary-saved-at { display: none !important; }
+
+  /* 레이아웃 */
+  .wrap { max-width: 100% !important; padding: 4px 8px !important; margin: 0 !important; }
+
+  /* 섹션 제목 잘림 방지 */
+  .section-title {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+    font-size: 9px !important;
+    margin-bottom: 6px !important;
+  }
+  .section-title + * {
+    break-before: avoid !important;
+    page-break-before: avoid !important;
+  }
+
+  /* KPI 그리드 - 한 줄 유지 */
+  .kpi-grid {
+    grid-template-columns: repeat(4,1fr) !important;
+    gap: 6px !important;
+    margin-bottom: 10px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .kpi-card {
+    padding: 10px !important;
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid !important;
+  }
+  .kpi-val { font-size: 18px !important; }
+
+  /* 런웨이 */
+  .runway-card {
+    padding: 12px !important;
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .runway-months { font-size: 32px !important; }
+
+  /* YoY */
+  .yoy-grid {
+    grid-template-columns: repeat(4,1fr) !important;
+    gap: 6px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .yoy-card { padding: 10px !important; box-shadow: none !important; border: 1px solid #ddd !important; }
+  .yoy-val { font-size: 14px !important; }
+
+  /* 채널별 */
+  .ch-grid {
+    grid-template-columns: repeat(5,1fr) !important;
+    gap: 5px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .ch-card { padding: 8px !important; box-shadow: none !important; border: 1px solid #ddd !important; }
+  .ch-val { font-size: 13px !important; }
+
+  /* 비용 경보 */
+  .alert-box {
+    padding: 10px 14px !important;
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .alert-item { padding: 6px 0 !important; }
+
+  /* 운전자본 */
+  .turnover-grid {
+    grid-template-columns: repeat(3,1fr) !important;
+    gap: 6px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .turnover-card { padding: 10px !important; box-shadow: none !important; border: 1px solid #ddd !important; }
+  .turnover-val { font-size: 22px !important; }
+
+  /* 주목할 점 */
+  .insights {
+    grid-template-columns: repeat(3,1fr) !important;
+    gap: 6px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .insight-card { padding: 10px !important; box-shadow: none !important; border: 1px solid #ddd !important; }
+
+  .g2 {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .panel {
+    padding: 12px !important;
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+  canvas { max-height: 160px !important; }
+
+  /* 경영 요약 textarea */
+  textarea {
+    border: 1px solid #ddd !important;
+    background: #fafafa !important;
+    font-size: 12px !important;
+    min-height: 60px !important;
+  }
+
+
+  /* 재무상태표 인쇄 최적화 */
+  .tabs, .tab { display: none !important; }
+  [id^="pane-"] { display: none !important; }
+  #pane-bs { display: block !important; }
+  .panel { padding: 12px !important; box-shadow: none !important; border: 1px solid #ddd !important; break-inside: avoid !important; }
+  canvas { max-height: 160px !important; }
+  table { font-size: 10px !important; }
+  /* 차트 패널 페이지 나누기 방지 */
+  .panel:has(canvas) {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  /* g2 전체 잘림 방지 */
+  .g2 {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  @page { margin: 10mm 8mm; size: A4 landscape; }
+}
 </style>
 </head>
 <body>
@@ -152,7 +294,7 @@ tr:hover td{background:var(--blue-light)}
       <a class="nav-tab" href="card.html">💳 법인카드</a>
     </nav>
   </div>
-  <div class="topbar-r">
+  <div class="topbar-r">      <button class="print-btn" onclick="doPrint()" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">🖨️ 인쇄 / PDF</button>
     <span class="badge" id="pbadge">데이터 없음</span>
     <label class="upbtn" id="upbtn">
       <input type="file" id="finput" accept=".xlsx,.xls" style="display:none">
@@ -299,7 +441,7 @@ tr:hover td{background:var(--blue-light)}
 </div>
 
 <script>
-const API = 'https://script.google.com/macros/s/AKfycbxft4SwgXRNwuSSD04Oeb8cn8WRoZo_eFq-8CnvoHbK01QZ-LbstqUYX0K3oc2BoPg/exec';
+const API = 'https://script.google.com/macros/s/AKfycbyn7prxsoo2BKV6LgtHyiKqfSB__lyRYr4-xBO6zJU8H55RHcHAXRzYSC4rA_SesjLi/exec';
 
 let allData = []; // [{period, label, data}]
 let charts = {}, curTab = 'overview';
@@ -802,6 +944,11 @@ window.selectPeriod=selectPeriod;
     console.error(err);
   }
 })();
+
+// 인쇄/PDF 안내
+function doPrint(){
+  window.print();
+}
 </script>
 </body>
 </html>
