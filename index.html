@@ -1043,6 +1043,10 @@ document.querySelector('.tabs').addEventListener('click',function(e){
   ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
     document.getElementById('pane-'+x).style.display=x===t?'block':'none';
   });
+  // display:none 상태에서 그려진 차트 크기 보정
+  setTimeout(function(){
+    Object.values(charts).forEach(function(c){ if(c) c.resize(); });
+  }, 50);
 });
 
 // 파일
