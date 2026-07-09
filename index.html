@@ -681,10 +681,6 @@ async function handleFile(file){
     await apiSave('__data__', parsed);
     await apiSave('__log__', {uploadedAt: now.toISOString(), month: uploadMonth});
 
-    // 차트 그리기 전 모든 pane 임시 block
-  ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
-    document.getElementById('pane-'+x).style.display='block';
-  });
   var result=await apiGet();
     D=result.data;
     uploadLog=result.log;
@@ -1415,10 +1411,6 @@ function renderPlan(D,PL){
 // 초기 로드
 (async function(){
   try{
-    // 차트 그리기 전 모든 pane 임시 block
-  ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
-    document.getElementById('pane-'+x).style.display='block';
-  });
   var result=await apiGet();
     D=result.data;
     uploadLog=result.log;
