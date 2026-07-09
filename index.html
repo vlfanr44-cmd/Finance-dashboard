@@ -543,6 +543,14 @@ const COL_IDX = [3,5,7,9,11,null,13,14,15,16,17,18]; // 1~5월, 6월없음(null)
 
 let D = null, uploadLog = null, _planData = null;
 let charts = {}, curTab = 'plan';
+function redrawCharts(){
+  if(!D) return;
+  Object.keys(charts).forEach(function(k){
+    if(charts[k]) charts[k].destroy();
+    delete charts[k];
+  });
+  render();
+}
 let selectedMi = -1; // 선택된 월 인덱스 (-1이면 최근 월)
 let isAccum = false;  // 누계 모드 여부
 
@@ -1048,7 +1056,8 @@ document.querySelector('.tabs').addEventListener('click',function(e){
   });
   // pane이 보이는 상태에서 차트 재렌더링
   if(D){
-    setTimeout(function(){ render(); }, 30);
+    if(D){
+    setTimeout(function(){ redrawCharts(); }, 30);
   }
 });
 
