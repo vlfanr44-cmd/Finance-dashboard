@@ -723,6 +723,8 @@ function render(){
 
   var smi=selectedMi; // 현재 선택된 월 인덱스
   var mLabels=MON_NM.slice(0,lmi+1);
+  // 차트 함수에서 사용할 전역 변수 저장
+  window._lmi=lmi; window._smi=smi; window._mLabels=mLabels;
 
   // ── 월 선택 바 ──
   var monBar=document.getElementById('mon-bar');
@@ -1007,6 +1009,64 @@ function render(){
     :'<div class="empty">업로드된 데이터 없음</div>';
 }
 
+function drawChartsForTab(t){
+  if(!D) return;
+  var lmi=window._lmi||D.lastMonthIdx;
+  var smi=window._smi||selectedMi;
+  var mLabels=window._mLabels||MON_NM.slice(0,lmi+1);
+  function slc(a){ return a.slice(0,lmi+1).map(function(v){return Math.round(M(v));}); }
+  function slcR(a){ return a.slice(0,lmi+1).map(function(v){return +((v||0)*100).toFixed(1);}); }
+
+  if(t==='trend'){
+    mkChart('c-trend',{type:'bar',data:{labels:mLabels,datasets:[
+      {type:'line',label:'매출액',data:slc(D.revenue),borderColor:'#2B4EBF',backgroundColor:'rgba(43,78,191,0.07)',borderWidth:3,pointRadius:4,pointBackgroundColor:'#2B4EBF',pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,fill:true,order:1},
+      {type:'line',label:'매출이익',data:slc(D.grossProfit),borderColor:'#2E7D52',backgroundColor:'rgba(46,125,82,0.07)',borderWidth:3,pointRadius:4,pointBackgroundColor:'#2E7D52',pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,fill:true,order:2},
+      {label:'영업이익',data:slc(D.opProfit),backgroundColor:D.opProfit.slice(0,lmi+1).map(function(v){return v>=0?'rgba(43,78,191,0.18)':'rgba(217,79,61,0.18)';}),borderRadius:6,order:3},
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:function(ctx){return ctx.dataset.label+': '+ctx.raw.toLocaleString()+'M';}}}}
+    ,scales:{x:xAx,y:yAx(function(v){return v.toLocaleString()+'M';})}}});
+    mkChart('c-margin',{type:'line',data:{labels:mLabels,datasets:[
+      {label:'매출이익률',data:slcR(D.grossMargin),borderColor:'#2f9e44',backgroundColor:'rgba(47,158,68,0.08)',borderWidth:3,pointRadius:4,pointBackgroundColor:'#2E7D52',pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,fill:true},
+      {label:'공제후이익률',data:slcR(D.netMargin),borderColor:'#F27B50',backgroundColor:'transparent',borderWidth:2.5,pointRadius:3,pointBackgroundColor:'#F27B50',pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,borderDash:[5,3]},
+      {label:'영업이익률',data:slcR(D.opMargin),borderColor:'#D94F3D',backgroundColor:'transparent',borderWidth:2.5,pointRadius:3,pointBackgroundColor:'#D94F3D',pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,borderDash:[3,2]},
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:function(ctx){return ctx.dataset.label+': '+ctx.raw+'%';}}}},scales:{x:xAx,y:yAx(function(v){return v+'%';})}}});
+  }
+
+  if(t==='channel'){
+    var chRevV=[D.ch_d2c,D.ch_b2b,D.ch_b2c,D.ch_store,D.ch_exp].map(function(a){
+      if(isAccum){var s=0;for(var i=0;i<=smi;i++)s+=M(a[i]||0);return Math.round(s);}
+      return Math.round(M(a[smi]));
+    });
+    var chGPV=[D.gp_d2c,D.gp_b2b,D.gp_b2c,D.gp_store,D.gp_exp].map(function(a){
+      if(isAccum){var s=0;for(var i=0;i<=smi;i++)s+=M(a[i]||0);return Math.round(s);}
+      return Math.round(M(a[smi]));
+    });
+    var chRevT=chRevV.reduce(function(a,b){return a+b;},0);
+    var chGPT=chGPV.reduce(function(a,b){return a+Math.max(b,0);},0);
+    mkChart('c-ch-pie',{type:'doughnut',data:{labels:CH_NM,datasets:[{data:chRevV,backgroundColor:CH_C,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return chRevT?ctx.label+': '+(ctx.raw/chRevT*100).toFixed(1)+'%':'-';}}}}}});
+    document.getElementById('ch-pie-leg').innerHTML=CH_NM.map(function(n,i){return '<div style="display:flex;justify-content:space-between;font-size:11px;color:#666"><span><span class="ldot" style="background:'+CH_C[i]+'"></span>'+n+'</span><span>'+chRevV[i].toLocaleString()+'M · '+(chRevT?(chRevV[i]/chRevT*100).toFixed(1):0)+'%</span></div>';}).join('');
+    mkChart('c-gp-pie',{type:'doughnut',data:{labels:CH_NM,datasets:[{data:chGPV.map(function(v){return Math.max(v,0);}),backgroundColor:CH_C,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return chGPT?ctx.label+': '+(ctx.raw/chGPT*100).toFixed(1)+'%':'-';}}}}}});
+    document.getElementById('gp-pie-leg').innerHTML=CH_NM.map(function(n,i){return '<div style="display:flex;justify-content:space-between;font-size:11px;color:#666"><span><span class="ldot" style="background:'+CH_C[i]+'"></span>'+n+'</span><span>'+chGPV[i].toLocaleString()+'M · 이익률 '+(chRevV[i]>0?(chGPV[i]/chRevV[i]*100).toFixed(1):'-')+'%</span></div>';}).join('');
+    mkChart('c-ch-trend',{type:'line',data:{labels:mLabels,datasets:[D.ch_d2c,D.ch_b2b,D.ch_b2c,D.ch_store,D.ch_exp].map(function(a,i){return {label:CH_NM[i],data:a.slice(0,lmi+1).map(function(v){return Math.round(M(v));}),borderColor:CH_C[i],backgroundColor:'transparent',borderWidth:2.5,pointRadius:4,pointBackgroundColor:CH_C[i],pointBorderColor:'#fff',pointBorderWidth:2,tension:.4};})},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:function(ctx){return ctx.dataset.label+': '+ctx.raw.toLocaleString()+'M';}}}}
+    ,scales:{x:xAx,y:yAx(function(v){return v.toLocaleString()+'M';})}}});
+  }
+
+  if(t==='cost'){
+    var costV=[D.labor,D.brand,D.fee,D.otherCst,D.depr].map(function(a){
+      if(isAccum){var s=0;for(var i=0;i<=smi;i++)s+=Math.abs(M(a[i]||0));return Math.round(s);}
+      return Math.round(Math.abs(M(a[smi])));
+    });
+    var costT=costV.reduce(function(a,b){return a+b;},0);
+    mkChart('c-cost-pie',{type:'doughnut',data:{labels:CST_NM,datasets:[{data:costV,backgroundColor:CST_C,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return costT?ctx.label+': '+(ctx.raw/costT*100).toFixed(1)+'%':'-';}}}}}});
+    document.getElementById('cost-leg').innerHTML=CST_NM.map(function(n,i){return '<div style="display:flex;justify-content:space-between;font-size:11px;color:#666"><span><span class="ldot" style="background:'+CST_C[i]+'"></span>'+n+'</span><span>'+costV[i].toLocaleString()+'M · '+(costT?(costV[i]/costT*100).toFixed(1):0)+'%</span></div>';}).join('');
+    mkChart('c-cost-trend',{type:'bar',data:{labels:mLabels,datasets:[D.labor,D.brand,D.fee,D.otherCst,D.depr].map(function(a,i){return {label:CST_NM[i],data:a.slice(0,lmi+1).map(function(v){return Math.round(Math.abs(M(v)));}),backgroundColor:CST_C[i],borderRadius:5,borderSkipped:false};})},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},scales:{x:Object.assign({},xAx,{stacked:true}),y:Object.assign({},yAx(function(v){return v+'M';}),{stacked:true})}}});
+    mkChart('c-log',{type:'bar',data:{labels:mLabels,datasets:[
+      {label:'물류비',data:D.logistics.slice(0,lmi+1).map(function(v){return Math.round(M(v));}),backgroundColor:'rgba(123,94,167,0.18)',borderRadius:6,yAxisID:'y'},
+      {type:'line',label:'물류비율',data:D.logisticsRate.slice(0,lmi+1).map(function(v){return +((v||0)*100).toFixed(1);}),borderColor:'#D94F3D',backgroundColor:'transparent',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#D94F3D',pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,yAxisID:'y1'},
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},scales:{x:xAx,y:Object.assign({},yAx(function(v){return v+'M';}),{position:'left'}),y1:{ticks:{font:{size:10},callback:function(v){return v+'%';}},grid:{display:false},position:'right'}}}});
+  }
+}
+
+
 function selectMonth(mi){
   selectedMi=mi;
   render();
@@ -1045,9 +1105,10 @@ document.querySelector('.tabs').addEventListener('click',function(e){
     document.getElementById('pane-'+x).style.display=x===t?'block':'none';
   });
   if(D){
-    Object.values(charts).forEach(function(c){if(c)c.destroy();});
-    charts={};
-    render();
+    // 해당 탭의 차트만 재생성
+    setTimeout(function(){
+      drawChartsForTab(t);
+    }, 0);
   }
 });
 
