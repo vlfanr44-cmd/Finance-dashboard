@@ -1045,8 +1045,12 @@ document.querySelector('.tabs').addEventListener('click',function(e){
   ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
     document.getElementById('pane-'+x).style.display=x===t?'block':'none';
   });
-  // 탭 전환 시 차트 재렌더링
-  if(D) render();
+  // 탭 전환 후 차트 resize (pane이 보이는 상태에서)
+  if(D){
+    setTimeout(function(){
+      Object.values(charts).forEach(function(c){ if(c && c.resize) c.resize(); });
+    }, 50);
+  }
 });
 
 // 파일
