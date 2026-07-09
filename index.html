@@ -430,7 +430,7 @@ textarea:focus{border-color:var(--blue)!important;background:var(--white)!import
       </div>
     </div>
 
-    <div id="pane-trend" style="display:none">
+    <div id="pane-trend">
       <div class="g2">
         <div class="panel">
           <div class="ptitle">월별 매출 · 매출이익 · 영업이익</div>
@@ -681,7 +681,7 @@ async function handleFile(file){
     await apiSave('__data__', parsed);
     await apiSave('__log__', {uploadedAt: now.toISOString(), month: uploadMonth});
 
-  var result=await apiGet();
+    var result=await apiGet();
     D=result.data;
     uploadLog=result.log;
     _planData=result.plan||null;
@@ -714,7 +714,6 @@ function render(){
   document.getElementById('dropzone').style.display=has?'none':'block';
   document.getElementById('main').style.display=has?'block':'none';
   if(!has) return;
-
 
   var lmi=D.lastMonthIdx;
 
@@ -1005,7 +1004,6 @@ function render(){
       '1~5월 데이터 전체가 자동으로 갱신됩니다.'+
     '</div>'
     :'<div class="empty">업로드된 데이터 없음</div>';
-
 }
 
 function selectMonth(mi){
@@ -1411,21 +1409,21 @@ function renderPlan(D,PL){
 // 초기 로드
 (async function(){
   try{
-  var result=await apiGet();
+    var result=await apiGet();
     D=result.data;
     uploadLog=result.log;
     _planData=result.plan||null;
     // memo 데이터 수집
     if(result.memos) _memoData=result.memos;
     document.getElementById('loading').style.display='none';
-    // 모든 pane 보이게 한 후 차트 그리기
+    // 모든 pane 보이게 해서 차트 크기 잡기
     ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
       document.getElementById('pane-'+x).style.display='block';
     });
     render();
-    // 차트 그린 후 curTab(plan)만 보이게
+    // plan만 보이게
     ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
-      document.getElementById('pane-'+x).style.display=x===curTab?'block':'none';
+      document.getElementById('pane-'+x).style.display=x==='plan'?'block':'none';
     });
   }catch(err){
     document.getElementById('loading').innerHTML=
