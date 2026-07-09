@@ -1008,12 +1008,12 @@ function render(){
       '1~5월 데이터 전체가 자동으로 갱신됩니다.'+
     '</div>'
     :'<div class="empty">업로드된 데이터 없음</div>';
-  // 차트 그린 후 curTab만 보이고 나머지 숨기기 (약간 딜레이)
+  // 차트 그린 후 curTab만 보이고 나머지 숨기기
   setTimeout(function(){
     ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
       document.getElementById('pane-'+x).style.display=x===curTab?'block':'none';
     });
-  }, 100);
+  }, 800);
 }
 
 function selectMonth(mi){
