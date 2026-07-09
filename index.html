@@ -714,10 +714,7 @@ function render(){
   document.getElementById('dropzone').style.display=has?'none':'block';
   document.getElementById('main').style.display=has?'block':'none';
   if(!has) return;
-  // 차트 렌더링을 위해 모든 pane 임시로 보이게
-  ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
-    document.getElementById('pane-'+x).style.display='block';
-  });
+
 
   var lmi=D.lastMonthIdx;
 
@@ -1008,12 +1005,7 @@ function render(){
       '1~5월 데이터 전체가 자동으로 갱신됩니다.'+
     '</div>'
     :'<div class="empty">업로드된 데이터 없음</div>';
-  // 차트 그린 후 curTab만 보이고 나머지 숨기기
-  setTimeout(function(){
-    ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
-      document.getElementById('pane-'+x).style.display=x===curTab?'block':'none';
-    });
-  }, 800);
+
 }
 
 function selectMonth(mi){
@@ -1053,6 +1045,8 @@ document.querySelector('.tabs').addEventListener('click',function(e){
   ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
     document.getElementById('pane-'+x).style.display=x===t?'block':'none';
   });
+  // 탭 전환 시 차트 재렌더링
+  if(D) render();
 });
 
 // 파일
