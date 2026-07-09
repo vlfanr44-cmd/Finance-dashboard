@@ -1046,14 +1046,13 @@ document.querySelector('.tabs').addEventListener('click',function(e){
   var b=e.target.closest('.tab'); if(!b) return;
   var t=b.dataset.t; curTab=t;
   document.querySelectorAll('.tab').forEach(function(x){x.classList.toggle('on',x.dataset.t===t);});
+  // 선택 탭 보이게
   ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
     document.getElementById('pane-'+x).style.display=x===t?'block':'none';
   });
-  // 탭 전환 후 차트 resize (pane이 보이는 상태에서)
+  // pane이 보이는 상태에서 차트 재렌더링
   if(D){
-    setTimeout(function(){
-      Object.values(charts).forEach(function(c){ if(c && c.resize) c.resize(); });
-    }, 50);
+    setTimeout(function(){ render(); }, 30);
   }
 });
 
@@ -1427,14 +1426,14 @@ function renderPlan(D,PL){
     // memo 데이터 수집
     if(result.memos) _memoData=result.memos;
     document.getElementById('loading').style.display='none';
-    // 모든 pane block 상태에서 차트 그리기
+    // 모든 pane 보이게 한 후 차트 그리기
     ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
       document.getElementById('pane-'+x).style.display='block';
     });
     render();
-    // 차트 그린 후 plan만 보이게
+    // 차트 그린 후 curTab(plan)만 보이게
     ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
-      document.getElementById('pane-'+x).style.display=x==='plan'?'block':'none';
+      document.getElementById('pane-'+x).style.display=x===curTab?'block':'none';
     });
   }catch(err){
     document.getElementById('loading').innerHTML=
