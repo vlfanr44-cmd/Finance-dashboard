@@ -1040,13 +1040,17 @@ document.querySelector('.tabs').addEventListener('click',function(e){
   var b=e.target.closest('.tab'); if(!b) return;
   var t=b.dataset.t; curTab=t;
   document.querySelectorAll('.tab').forEach(function(x){x.classList.toggle('on',x.dataset.t===t);});
+  // 먼저 모든 pane 숨기기
   ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
-    document.getElementById('pane-'+x).style.display=x===t?'block':'none';
+    document.getElementById('pane-'+x).style.display='none';
   });
-  // display:none 상태에서 그려진 차트 크기 보정
-  setTimeout(function(){
-    Object.values(charts).forEach(function(c){ if(c) c.resize(); });
-  }, 50);
+  // 해당 pane 보이게 한 후 차트 재렌더링
+  document.getElementById('pane-'+t).style.display='block';
+  if(D){
+    setTimeout(function(){
+      render();
+    }, 30);
+  }
 });
 
 // 파일
