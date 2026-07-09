@@ -542,7 +542,7 @@ const MON_NM = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','
 const COL_IDX = [3,5,7,9,11,null,13,14,15,16,17,18]; // 1~5월, 6월없음(null), 7~12월
 
 let D = null, uploadLog = null, _planData = null;
-let charts = {}, curTab = 'trend';
+let charts = {}, curTab = 'plan';
 let selectedMi = -1; // 선택된 월 인덱스 (-1이면 최근 월)
 let isAccum = false;  // 누계 모드 여부
 
@@ -1008,10 +1008,12 @@ function render(){
       '1~5월 데이터 전체가 자동으로 갱신됩니다.'+
     '</div>'
     :'<div class="empty">업로드된 데이터 없음</div>';
-  // 차트 그린 후 curTab만 보이고 나머지 숨기기
-  ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
-    document.getElementById('pane-'+x).style.display=x===curTab?'block':'none';
-  });
+  // 차트 그린 후 curTab만 보이고 나머지 숨기기 (약간 딜레이)
+  setTimeout(function(){
+    ['plan','trend','channel','cost','tbl','mgr'].forEach(function(x){
+      document.getElementById('pane-'+x).style.display=x===curTab?'block':'none';
+    });
+  }, 100);
 }
 
 function selectMonth(mi){
