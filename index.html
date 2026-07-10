@@ -540,7 +540,8 @@ const CST_C  = ['#2B4EBF','#F27B50','#2E7D52','#A89880','#D94F3D'];
 const CH_NM  = ['자사몰','B2B','B2C','Store','Export'];
 const CST_NM = ['인건비','브랜드마케팅','지급수수료','기타경비','감가상각'];
 const MON_NM = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-const COL_IDX = [3,5,7,9,11,null,13,14,15,16,17,18]; // 1~5월, 6월없음(null), 7~12월
+// COL_IDX는 더 이상 고정값이 아님 — 파일마다 열 구조가 달라질 수 있어(달마다 %열 위치가 이동하거나
+// 특정 달 헤더가 아예 빠지는 경우가 있음) 업로드할 때마다 헤더 텍스트("N월")를 읽어 동적으로 감지한다.
 
 let D = null, uploadLog = null, _planData = null;
 let charts = {}, curTab = 'plan';
@@ -589,57 +590,111 @@ async function apiClear(){
 }
 
 // ── 엑셀 파싱 ────────────────────────────────────────────
-function getMonthVals(row){
-  return COL_IDX.map(function(ci){
-    if(ci===null) return 0; // 6월 데이터 없음
+// 헤더 행(5행)에서 "N월" 텍스트를 찾아 실제 열 위치를 자동으로 감지한다.
+// 파일마다 %열 위치가 이동하거나 특정 달 헤더 컬럼이 통째로 빠지는 경우가 있어
+// 고정된 열 인덱스 대신 매 업로드마다 이 방식으로 다시 계산한다.
+function detectColIdx(rows){
+  var headerRow = rows[4] || []; // 5행 = 헤더
+  var map = {};
+  var gubunCount = 0;
+  for(var c=0;c<headerRow.length;c++){
+    var v=headerRow[c];
+    if(typeof v==='string' && v.trim()==='구분'){
+      gubunCount++;
+      // 같은 행 오른쪽에 연간요약 등 다른 표가 또 시작되면(두번째 '구분') 그 지점부터는 무시.
+      // 그 표의 열 구조와 행 번호가 우리가 읽는 R(n) 행들과 다를 수 있어 뒤섞이면 안 됨.
+      if(gubunCount>1) break;
+      continue;
+    }
+    if(typeof v==='string'){
+      var m=v.trim().match(/^(\d{1,2})월$/);
+      if(m){
+        var mo=parseInt(m[1],10);
+        if(mo>=1&&mo<=12&&!map.hasOwnProperty(mo)) map[mo]=c;
+      }
+    }
+  }
+  var colIdx=[];
+  for(var mo2=1;mo2<=12;mo2++){
+    colIdx.push(map.hasOwnProperty(mo2)?map[mo2]:null);
+  }
+  return colIdx;
+}
+
+function getMonthVals(row,colIdx){
+  return colIdx.map(function(ci){
+    if(ci===null) return 0; // 해당 달 헤더 컬럼 자체가 없음(주로 미래 달)
     var v=row[ci];
     return (typeof v==='number'&&isFinite(v))?v:0;
   });
 }
 
+// D.noDataMi에 담긴 "실제 데이터 컬럼이 없는 달" 인덱스들을 월 선택/차트/전월비 계산에서 건너뛴다.
+// (12칸 배열 자체는 실제 달력(1~12월)과 정렬을 유지해야 예산 데이터·업로드 월 문자열과 어긋나지 않음)
+function isValidMi(mi,noDataMi){ return (noDataMi||[]).indexOf(mi)===-1; }
+function prevValidMi(mi,noDataMi){
+  for(var i=mi-1;i>=0;i--){ if(isValidMi(i,noDataMi)) return i; }
+  return -1;
+}
+function validMiList(uptoIdx,noDataMi){
+  var res=[];
+  for(var i=0;i<=uptoIdx;i++){ if(isValidMi(i,noDataMi)) res.push(i); }
+  return res;
+}
+function pickValid(arr,uptoIdx,noDataMi){
+  return validMiList(uptoIdx,noDataMi).map(function(i){ return arr[i]; });
+}
+
 function parseReport1(rows){
   function R(n){ return rows[n-1]||[]; }
 
+  var colIdx = detectColIdx(rows);
+  var noDataMi = [];
+  colIdx.forEach(function(ci,mi){ if(ci===null) noDataMi.push(mi); });
+
   var revRow=R(6);
   var lastMonthIdx=0;
-  COL_IDX.forEach(function(ci,mi){
+  colIdx.forEach(function(ci,mi){
+    if(ci===null) return;
     var v=revRow[ci];
     if(typeof v==='number'&&v>0) lastMonthIdx=mi;
   });
 
+  function GV(row){ return getMonthVals(row,colIdx); }
   function addArrays(a,b){
     return a.map(function(v,i){ return v+(b[i]||0); });
   }
 
   return {
     lastMonthIdx: lastMonthIdx,
-    revenue:      getMonthVals(R(6)),
-    grossProfit:  getMonthVals(R(18)),
-    grossMargin:  getMonthVals(R(19)),
-    logistics:    getMonthVals(R(36)),
-    logisticsRate:getMonthVals(R(37)),
-    netRevenue:   getMonthVals(R(47)),
-    netMargin:    getMonthVals(R(48)),
-    sga1:         getMonthVals(R(58)),
-    sga2:         getMonthVals(R(71)),
-    opProfit:     getMonthVals(R(76)),
-    opMargin:     getMonthVals(R(77)),
-    contribution: getMonthVals(R(78)),
-    labor:        addArrays(getMonthVals(R(65)), getMonthVals(R(72))),
-    brand:        getMonthVals(R(62)),
-    fee:          addArrays(getMonthVals(R(61)), getMonthVals(R(73))),
-    otherCst:     addArrays(getMonthVals(R(68)), getMonthVals(R(74))),
-    depr:         getMonthVals(R(75)),
-    ch_d2c:       getMonthVals(R(7)),
-    ch_b2b:       getMonthVals(R(8)),
-    ch_b2c:       getMonthVals(R(11)),
-    ch_store:     getMonthVals(R(16)),
-    ch_exp:       getMonthVals(R(17)),
-    gp_d2c:       getMonthVals(R(20)),
-    gp_b2b:       getMonthVals(R(21)),
-    gp_b2c:       getMonthVals(R(24)),
-    gp_store:     getMonthVals(R(27)),
-    gp_exp:       getMonthVals(R(28)),
+    noDataMi:     noDataMi,
+    revenue:      GV(R(6)),
+    grossProfit:  GV(R(18)),
+    grossMargin:  GV(R(19)),
+    logistics:    GV(R(36)),
+    logisticsRate:GV(R(37)),
+    netRevenue:   GV(R(47)),
+    netMargin:    GV(R(48)),
+    sga1:         GV(R(58)),
+    sga2:         GV(R(71)),
+    opProfit:     GV(R(76)),
+    opMargin:     GV(R(77)),
+    contribution: GV(R(78)),
+    labor:        addArrays(GV(R(65)), GV(R(72))),
+    brand:        GV(R(62)),
+    fee:          addArrays(GV(R(61)), GV(R(73))),
+    otherCst:     addArrays(GV(R(68)), GV(R(74))),
+    depr:         GV(R(75)),
+    ch_d2c:       GV(R(7)),
+    ch_b2b:       GV(R(8)),
+    ch_b2c:       GV(R(11)),
+    ch_store:     GV(R(16)),
+    ch_exp:       GV(R(17)),
+    gp_d2c:       GV(R(20)),
+    gp_b2b:       GV(R(21)),
+    gp_b2c:       GV(R(24)),
+    gp_store:     GV(R(27)),
+    gp_exp:       GV(R(28)),
   };
 }
 
@@ -722,17 +777,33 @@ function render(){
   });
 
   var lmi=D.lastMonthIdx;
+  var nDMi=D.noDataMi||[]; // 이 업로드에서 실제 컬럼이 없던 달들(주로 미래 달)
+  function isValidMi(mi){ return nDMi.indexOf(mi)===-1; }
+  function prevValidMi(mi){
+    for(var i=mi-1;i>=0;i--){ if(isValidMi(i)) return i; }
+    return -1;
+  }
+  function validMiList(uptoIdx){
+    var res=[];
+    for(var i=0;i<=uptoIdx;i++){ if(isValidMi(i)) res.push(i); }
+    return res;
+  }
+  function pickValid(arr,uptoIdx){
+    return validMiList(uptoIdx).map(function(i){ return arr[i]; });
+  }
 
-  // 선택된 월이 유효하지 않으면 최근 월로 초기화
-  if(selectedMi<0 || selectedMi>lmi) selectedMi=lmi;
+  // 선택된 월이 유효하지 않으면(범위 밖 또는 데이터 없는 달) 최근 월로 초기화
+  if(selectedMi<0 || selectedMi>lmi || !isValidMi(selectedMi)) selectedMi=lmi;
 
   var smi=selectedMi; // 현재 선택된 월 인덱스
-  var mLabels=MON_NM.slice(0,lmi+1);
+  var validMi=validMiList(lmi); // 실제 데이터가 있는 월 인덱스 목록
+  var mLabels=validMi.map(function(i){ return MON_NM[i]; });
 
   // ── 월 선택 바 ──
   var monBar=document.getElementById('mon-bar');
   monBar.innerHTML='<span class="mon-lbl">월 선택:</span>'+
-    MON_NM.slice(0,lmi+1).map(function(m,i){
+    validMi.map(function(i){
+      var m=MON_NM[i];
       return '<button class="mon-btn'+((!isAccum&&i===smi)?' on':'')+'" onclick="selectMonthOnly('+i+')">'+m+'</button>';
     }).join('')+
     '<div class="mon-sep-v"></div>'+
@@ -747,8 +818,9 @@ function render(){
   }
   function lv(k){ return isAccum ? sumTo(k,smi) : M(D[k][smi]); }
   function pv(k){
-    if(smi===0) return null;
-    return isAccum ? sumTo(k,smi-1) : M(D[k][smi-1]);
+    var p=prevValidMi(smi);
+    if(p<0) return null;
+    return isAccum ? sumTo(k,p) : M(D[k][p]);
   }
   // 이익률은 누계 시 합산값으로 재계산
   function gpRateVal(){
@@ -770,9 +842,10 @@ function render(){
     :'2026년 1~'+MON_NM[lmi]+' 중 '+MON_NM[smi];
 
   // KPI
-  var dRev=smi>0?pct(lv('revenue'),pv('revenue')):null;
-  var dGP =smi>0?pct(lv('grossProfit'),pv('grossProfit')):null;
-  var dOP =smi>0?pct(lv('opProfit'),pv('opProfit')):null;
+  var _pmi=prevValidMi(smi);
+  var dRev=_pmi>=0?pct(lv('revenue'),pv('revenue')):null;
+  var dGP =_pmi>=0?pct(lv('grossProfit'),pv('grossProfit')):null;
+  var dOP =_pmi>=0?pct(lv('opProfit'),pv('opProfit')):null;
 
   var lRev=lv('revenue'), lGP=lv('grossProfit'), lOP=lv('opProfit');
   var gpRate=gpRateVal(), opRate=opRateVal();
@@ -792,8 +865,8 @@ function render(){
       '</div>';
   }).join('');
 
-  function slc(a){ return a.slice(0,lmi+1).map(function(v){return Math.round(M(v));}); }
-  function slcR(a){ return a.slice(0,lmi+1).map(function(v){return +((v||0)*100).toFixed(1);}); }
+  function slc(a){ return pickValid(a,lmi).map(function(v){return Math.round(M(v));}); }
+  function slcR(a){ return pickValid(a,lmi).map(function(v){return +((v||0)*100).toFixed(1);}); }
 
   // 손익 추이
   mkChart('c-trend',{
@@ -801,7 +874,7 @@ function render(){
     data:{labels:mLabels,datasets:[
       {type:'line',label:'매출액',data:slc(D.revenue),borderColor:'#2B4EBF',backgroundColor:'rgba(43,78,191,0.07)',borderWidth:3,pointRadius:4,pointBackgroundColor:'#2B4EBF',pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,fill:true,order:1},
       {type:'line',label:'매출이익',data:slc(D.grossProfit),borderColor:'#2E7D52',backgroundColor:'rgba(46,125,82,0.07)',borderWidth:3,pointRadius:4,pointBackgroundColor:'#2E7D52',pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,fill:true,order:2},
-      {label:'영업이익',data:slc(D.opProfit),backgroundColor:D.opProfit.slice(0,lmi+1).map(function(v){return v>=0?'rgba(43,78,191,0.18)':'rgba(217,79,61,0.18)';}),borderRadius:6,order:3},
+      {label:'영업이익',data:slc(D.opProfit),backgroundColor:pickValid(D.opProfit,lmi).map(function(v){return v>=0?'rgba(43,78,191,0.18)':'rgba(217,79,61,0.18)';}),borderRadius:6,order:3},
     ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:function(ctx){return ctx.dataset.label+': '+ctx.raw.toLocaleString()+'M';}}}},
@@ -823,9 +896,9 @@ function render(){
 
   // 전월 대비
   document.getElementById('delta-title').textContent=
-    smi>0?'전월 대비 증감 ('+MON_NM[smi-1]+' → '+MON_NM[smi]+')':'전월 대비 증감';
+    _pmi>=0?'전월 대비 증감 ('+MON_NM[_pmi]+' → '+MON_NM[smi]+')':'전월 대비 증감';
 
-  if(smi>0){
+  if(_pmi>=0){
     var dRows=[
       {nm:'매출액',    l:lv('revenue'),    p:pv('revenue'),    inv:false},
       {nm:'매출이익',  l:lv('grossProfit'),p:pv('grossProfit'),inv:false},
@@ -836,7 +909,7 @@ function render(){
     ];
     document.getElementById('delta-body').innerHTML=
       '<div class="twrap"><table>'+
-      '<thead><tr><th>항목</th><th>'+MON_NM[smi-1]+'</th><th>'+MON_NM[smi]+'</th><th>증감</th><th>증감률</th></tr></thead>'+
+      '<thead><tr><th>항목</th><th>'+MON_NM[_pmi]+'</th><th>'+MON_NM[smi]+'</th><th>증감</th><th>증감률</th></tr></thead>'+
       '<tbody>'+dRows.map(function(r){
         var d=r.l-r.p, pp=pct(r.l,r.p);
         var cls=r.inv?dc(-d):dc(d);
@@ -890,7 +963,7 @@ function render(){
   mkChart('c-ch-trend',{
     type:'line',
     data:{labels:mLabels,datasets:[D.ch_d2c,D.ch_b2b,D.ch_b2c,D.ch_store,D.ch_exp].map(function(a,i){
-      return {label:CH_NM[i],data:a.slice(0,lmi+1).map(function(v){return Math.round(M(v));}),
+      return {label:CH_NM[i],data:pickValid(a,lmi).map(function(v){return Math.round(M(v));}),
         borderColor:CH_C[i],backgroundColor:'transparent',borderWidth:2.5,pointRadius:4,pointBackgroundColor:CH_C[i],pointBorderColor:'#fff',pointBorderWidth:2,tension:.4};
     })},
     options:{responsive:true,maintainAspectRatio:false,
@@ -920,7 +993,7 @@ function render(){
   mkChart('c-cost-trend',{
     type:'bar',
     data:{labels:mLabels,datasets:[D.labor,D.brand,D.fee,D.otherCst,D.depr].map(function(a,i){
-      return {label:CST_NM[i],data:a.slice(0,lmi+1).map(function(v){return Math.round(Math.abs(M(v)));}),backgroundColor:CST_C[i],borderRadius:5,borderSkipped:false};
+      return {label:CST_NM[i],data:pickValid(a,lmi).map(function(v){return Math.round(Math.abs(M(v)));}),backgroundColor:CST_C[i],borderRadius:5,borderSkipped:false};
     })},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
@@ -931,8 +1004,8 @@ function render(){
   mkChart('c-log',{
     type:'bar',
     data:{labels:mLabels,datasets:[
-      {label:'물류비',data:D.logistics.slice(0,lmi+1).map(function(v){return Math.round(M(v));}),backgroundColor:'rgba(123,94,167,0.18)',borderRadius:6,yAxisID:'y'},
-      {type:'line',label:'물류비율',data:D.logisticsRate.slice(0,lmi+1).map(function(v){return +((v||0)*100).toFixed(1);}),
+      {label:'물류비',data:pickValid(D.logistics,lmi).map(function(v){return Math.round(M(v));}),backgroundColor:'rgba(123,94,167,0.18)',borderRadius:6,yAxisID:'y'},
+      {type:'line',label:'물류비율',data:pickValid(D.logisticsRate,lmi).map(function(v){return +((v||0)*100).toFixed(1);}),
         borderColor:'#D94F3D',backgroundColor:'transparent',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#D94F3D',pointBorderColor:'#fff',pointBorderWidth:2,tension:.4,yAxisID:'y1'},
     ]},
     options:{responsive:true,maintainAspectRatio:false,
@@ -969,7 +1042,7 @@ function render(){
   var thead='<thead><tr><th>항목</th>'+mLabels.map(function(m){return '<th>'+m+'</th>';}).join('')+(isAccum?'<th style="background:#fffbeb;color:#92400e">누계</th>':'')+'</tr></thead>';
   var tbody='<tbody>'+tRows.map(function(r){
     return '<tr class="'+(r.bold?'bold':'')+'"><td>'+r.l+'</td>'+
-      Array.from({length:lmi+1},function(_,mi){
+      validMi.map(function(mi){
         var v=r.pct?(D[r.k][mi]||0)*100:M(D[r.k][mi]||0);
         var cls=r.bold&&!r.pct?(v<0?'dn':v>0?'up':''):'';
         var disp=r.pct?v.toFixed(1)+'%':Math.round(v).toLocaleString()+'M';
